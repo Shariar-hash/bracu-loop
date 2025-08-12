@@ -1,8 +1,11 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { LucideIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 interface FeatureCardProps {
   icon: LucideIcon;
@@ -24,6 +27,23 @@ export const FeatureCard = ({
   ctaLink,
 }: FeatureCardProps) => {
   const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const protectedRoutes = ['/review', '/notes', '/questions', '/suggestions'];
+  
+  const handleNavigation = () => {
+    const isProtected = protectedRoutes.includes(ctaLink);
+    
+    if (isProtected && !user) {
+      toast.error('Please sign in to access this feature');
+      setIsOpen(false);
+      return;
+    }
+    
+    navigate(ctaLink);
+    setIsOpen(false);
+  };
 
   return (
     <>
@@ -63,15 +83,12 @@ export const FeatureCard = ({
             </DialogDescription>
           </DialogHeader>
           <div className="mt-6">
-                          <Button 
-                onClick={() => {
-                  // Navigate to the specified link
-                  // TODO: Implement proper routing
-                }}
-                className="w-full"
-              >
-                {ctaText}
-              </Button>
+            <Button 
+              onClick={handleNavigation}
+              className="w-full"
+            >
+              {ctaText}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

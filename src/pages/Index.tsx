@@ -17,7 +17,7 @@ const features = [
     modalTitle: "Faculty Review",
     modalText: "Browse instructors, read reviews, leave a rating, and upvote helpful comments. Simple replies (no long threads) and a 'report' option keep things clean.",
     ctaText: "Go to Reviews",
-    ctaLink: "/reviews"
+    ctaLink: "/review"
   },
   {
     icon: FileText,
@@ -53,7 +53,7 @@ const features = [
     modalTitle: "Empty Rooms & Labs Finder",
     modalText: "Check real-time or schedule-based availability of classrooms and labs. Filter by building, time range, and capacity to quickly find a study spot.",
     ctaText: "Find a Room",
-    ctaLink: "/rooms"
+    ctaLink: "/roomfinder"
   }
 ];
 

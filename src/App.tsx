@@ -5,8 +5,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import Review from "./pages/Review";
+import Notes from "./pages/Notes";
+import Questions from "./pages/Questions";
+import Suggestions from "./pages/Suggestions";
+import RoomFinder from "./pages/RoomFinder";
 
 const queryClient = new QueryClient();
 
@@ -20,6 +26,32 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Index />} />
+              
+              {/* Protected routes - require authentication */}
+              <Route path="/review" element={
+                <ProtectedRoute>
+                  <Review />
+                </ProtectedRoute>
+              } />
+              <Route path="/notes" element={
+                <ProtectedRoute>
+                  <Notes />
+                </ProtectedRoute>
+              } />
+              <Route path="/questions" element={
+                <ProtectedRoute>
+                  <Questions />
+                </ProtectedRoute>
+              } />
+              <Route path="/suggestions" element={
+                <ProtectedRoute>
+                  <Suggestions />
+                </ProtectedRoute>
+              } />
+              
+              {/* Public route - no authentication required */}
+              <Route path="/roomfinder" element={<RoomFinder />} />
+              
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
