@@ -8,17 +8,18 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    /* Light theme with soft warm gradients */
+    --background: 210 20% 98%;
     --foreground: 215 25% 27%;
 
-    --card: 0 0% 100%;
+    --card: 210 20% 98%;
     --card-foreground: 215 25% 27%;
 
-    --popover: 0 0% 100%;
+    --popover: 210 20% 98%;
     --popover-foreground: 215 25% 27%;
 
     --primary: 262 83% 58%;
-    --primary-foreground: 0 0% 100%;
+    --primary-foreground: 210 20% 98%;
 
     --secondary: 262 15% 95%;
     --secondary-foreground: 215 25% 27%;
@@ -30,7 +31,7 @@ All colors MUST be HSL.
     --accent-foreground: 262 83% 58%;
 
     --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive-foreground: 210 20% 98%;
 
     --border: 220 13% 91%;
     --input: 220 13% 91%;
@@ -53,59 +54,54 @@ All colors MUST be HSL.
 
     --radius: 0.75rem;
 
-    --sidebar-background: 0 0% 98%;
-
+    --sidebar-background: 210 15% 97%;
     --sidebar-foreground: 240 5.3% 26.1%;
-
     --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
+    --sidebar-primary-foreground: 210 15% 97%;
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
-
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    /* Dark theme with soft purple-blue gradients */
+    --background: 235 15% 8%;
+    --foreground: 210 20% 92%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 235 15% 10%;
+    --card-foreground: 210 20% 92%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 235 15% 10%;
+    --popover-foreground: 210 20% 92%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 262 83% 65%;
+    --primary-foreground: 235 15% 8%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 235 15% 15%;
+    --secondary-foreground: 210 20% 92%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 235 15% 15%;
+    --muted-foreground: 215 20% 65%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 235 15% 15%;
+    --accent-foreground: 210 20% 92%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 210 20% 92%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --border: 235 15% 18%;
+    --input: 235 15% 18%;
+    --ring: 262 83% 65%;
+
+    --sidebar-background: 235 15% 6%;
+    --sidebar-foreground: 210 15% 88%;
+    --sidebar-primary: 262 83% 65%;
+    --sidebar-primary-foreground: 235 15% 6%;
+    --sidebar-accent: 235 15% 12%;
+    --sidebar-accent-foreground: 210 15% 88%;
+    --sidebar-border: 235 15% 18%;
+    --sidebar-ring: 262 83% 65%;
   }
 }
 
@@ -116,6 +112,12 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    background: linear-gradient(135deg, 
+      hsl(var(--background)) 0%, 
+      hsl(var(--background)) 40%,
+      hsl(var(--secondary)) 100%);
+    min-height: 100vh;
+    transition: background 0.3s ease;
   }
 }
 
@@ -127,10 +129,19 @@ All colors MUST be HSL.
   .feature-card {
     @apply transition-all duration-300 ease-out hover:scale-105 hover:shadow-lg;
     box-shadow: var(--shadow-soft);
+    background: linear-gradient(135deg, 
+      hsl(var(--card)) 0%, 
+      hsl(var(--card)) 70%,
+      hsl(var(--secondary)) 100%);
+    border: 1px solid hsl(var(--border));
   }
 
   .feature-card:hover {
     box-shadow: var(--shadow-glow);
+    background: linear-gradient(135deg, 
+      hsl(var(--card)) 0%, 
+      hsl(var(--accent)) 70%,
+      hsl(var(--secondary)) 100%);
   }
 
   .search-input {
