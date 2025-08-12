@@ -11,13 +11,13 @@ export const Footer = () => {
           <div className="flex gap-6">
             <button 
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              onClick={() => console.log('Navigate to: /terms')}
+              onClick={() => {/* Navigate to: /terms */}}
             >
               Terms
             </button>
             <button 
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              onClick={() => console.log('Navigate to: /privacy')}
+              onClick={() => {/* Navigate to: /privacy */}}
             >
               Privacy
             </button>

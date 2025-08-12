@@ -1,5 +1,5 @@
-import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 
 export const Header = () => {
   return (
@@ -16,13 +16,7 @@ export const Header = () => {
           {/* Action Buttons */}
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            <Button 
-              variant="ghost" 
-              className="hidden sm:inline-flex"
-              onClick={() => console.log('Navigate to: /signin')}
-            >
-              Sign in
-            </Button>
+            <GoogleSignInButton />
           </div>
         </div>
       </div>

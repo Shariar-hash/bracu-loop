@@ -151,4 +151,40 @@ All colors MUST be HSL.
   .search-input:focus {
     box-shadow: var(--shadow-glow);
   }
+
+  /* Google Sign-In Button Customization */
+  .google-signin-button iframe {
+    border-radius: var(--radius) !important;
+    transition: all 0.2s ease !important;
+  }
+
+  /* Override Google button styling to match theme */
+  .google-signin-button iframe:hover {
+    box-shadow: var(--shadow-medium) !important;
+  }
+
+  /* Target Google's iframe content - this may not work due to CORS but worth trying */
+  .google-signin-button iframe[src*="gsi"] {
+    filter: none !important;
+  }
+
+  /* Alternative approach: style the container */
+  .google-signin-container {
+    @apply rounded-lg overflow-hidden transition-all duration-200;
+    border: 1px solid hsl(var(--border));
+    background: hsl(var(--background));
+  }
+
+  .google-signin-container:hover {
+    @apply shadow-md;
+    box-shadow: var(--shadow-medium);
+    transform: translateY(-1px);
+  }
+
+  /* Force Google button to respect our theme colors */
+  .google-signin-container iframe {
+    border: none !important;
+    border-radius: calc(var(--radius) - 2px) !important;
+    background: transparent !important;
+  }
 }

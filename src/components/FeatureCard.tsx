@@ -63,16 +63,15 @@ export const FeatureCard = ({
             </DialogDescription>
           </DialogHeader>
           <div className="mt-6">
-            <Button 
-              className="w-full campus-gradient text-white font-medium"
-              onClick={() => {
-                setIsOpen(false);
-                // In a real app, navigate to ctaLink
-                console.log(`Navigate to: ${ctaLink}`);
-              }}
-            >
-              {ctaText}
-            </Button>
+                          <Button 
+                onClick={() => {
+                  // Navigate to the specified link
+                  // TODO: Implement proper routing
+                }}
+                className="w-full"
+              >
+                {ctaText}
+              </Button>
           </div>
         </DialogContent>
       </Dialog>
