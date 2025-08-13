@@ -9,6 +9,8 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Review from "./pages/Review";
+import FacultyReview from "./pages/FacultyReviewIndex";
+import FacultyDetail from "./pages/FacultyDetail";
 import Notes from "./pages/Notes";
 import Questions from "./pages/Questions";
 import Suggestions from "./pages/Suggestions";
@@ -23,16 +25,23 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <BrowserRouter>
+          <BrowserRouter
+            future={{
+              v7_startTransition: true,
+              v7_relativeSplatPath: true
+            }}
+          >
             <Routes>
               <Route path="/" element={<Index />} />
               
               {/* Protected routes - require authentication */}
               <Route path="/review" element={
                 <ProtectedRoute>
-                  <Review />
+                  <FacultyReview />
                 </ProtectedRoute>
               } />
+              {/* Faculty detail page (public for now, can be protected if needed) */}
+              <Route path="/faculty/:facultyId" element={<FacultyDetail />} />
               <Route path="/notes" element={
                 <ProtectedRoute>
                   <Notes />

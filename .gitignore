@@ -124,3 +124,17 @@ temp/
 
 # Built Visual Studio Code Extensions
 *.vsix
+
+# Development and debugging files
+debug_*.sql
+fix_*.py
+fix-*.ps1
+setup-database.js
+test-db.js
+star-rating-component.tsx
+*_DATABASE_FIX.sql
+URGENT_FIX_DATABASE.sql
+disable_rls_temporarily.sql
+
+# Database backup files
+*.backup.tsx
