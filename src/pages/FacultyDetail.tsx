@@ -4,6 +4,18 @@ import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { Header } from '../components/Header';
 import { ArrowLeft, Star, MessageCircle, ThumbsUp, ThumbsDown, Flag, Send, X, Edit, Trash2, Mail, MapPin } from 'lucide-react';
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface Review {
   faculty_initial: string;
@@ -57,6 +69,8 @@ const FacultyDetail: React.FC = () => {
   const [showAllReplies, setShowAllReplies] = useState<{[key: string]: boolean}>({});
   const [sortBy, setSortBy] = useState<'recent' | 'upvoted'>('recent'); // Comment sorting filter
   const [isFetchingReviews, setIsFetchingReviews] = useState(false); // Prevent multiple simultaneous fetches
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [reviewToDelete, setReviewToDelete] = useState<Review | null>(null);
 
   // FACEBOOK-STYLE: Format reply text to highlight @mentions
   const formatReplyText = (text: string) => {
@@ -297,25 +311,101 @@ const FacultyDetail: React.FC = () => {
       await fetchFacultyDetail();
       await fetchReviews();
     };
-    
+
     init();
+
+    // Set up real-time subscription for reviews
+    const reviewsSubscription = supabase
+      .channel('reviews-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'reviews',
+          filter: `faculty_initial=eq.${facultyId}`
+        },
+        (payload) => {
+          console.log('Real-time update received:', payload);
+          
+          if (payload.eventType === 'INSERT') {
+            // New review added
+            const newReview = payload.new as Review;
+            setReviews(prev => [newReview, ...prev]);
+            
+            // Show toast if it's not the current user's review
+            if (user && newReview.user_email !== user.email) {
+              toast.info('New review posted!', {
+                description: `${newReview.user_name} shared their thoughts`
+              });
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            // Review updated
+            const updatedReview = payload.new as Review;
+            setReviews(prev => prev.map(review => 
+              review.created_at === updatedReview.created_at && 
+              review.faculty_initial === updatedReview.faculty_initial && 
+              (review.course_code || '') === (updatedReview.course_code || '')
+                ? updatedReview 
+                : review
+            ));
+          } else if (payload.eventType === 'DELETE') {
+            // Review deleted
+            const deletedReview = payload.old as Review;
+            setReviews(prev => prev.filter(review => 
+              !(review.created_at === deletedReview.created_at && 
+                review.faculty_initial === deletedReview.faculty_initial && 
+                (review.course_code || '') === (deletedReview.course_code || ''))
+            ));
+          }
+        }
+      )
+      .subscribe();
+
+    // Set up real-time subscription for votes
+    const votesSubscription = supabase
+      .channel('votes-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'review_votes',
+          filter: `review_faculty_initial=eq.${facultyId}`
+        },
+        (payload) => {
+          console.log('Vote update received:', payload);
+          // Refresh user votes when votes change
+          if (user) {
+            fetchReviews();
+          }
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscriptions on unmount
+    return () => {
+      reviewsSubscription.unsubscribe();
+      votesSubscription.unsubscribe();
+    };
+    
     // eslint-disable-next-line
-  }, [facultyId]);
+  }, [facultyId, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!rating) {
-      alert('Please select a rating.');
+      toast.error('Please select a rating.');
       return;
     }
     
     if (!comment.trim()) {
-      alert('Please write a review comment.');
+      toast.error('Please write a review comment.');
       return;
     }
     
     if (!user) {
-      alert('Please sign in to submit a review.');
+      toast.error('Please sign in to submit a review.');
       return;
     }
     
@@ -341,11 +431,13 @@ const FacultyDetail: React.FC = () => {
       
       if (error) {
         console.error('Review submission error:', error);
-        alert(`Failed to submit review: ${error.message}`);
+        toast.error('Failed to submit review', {
+          description: error.message
+        });
       } else {
         console.log('Review submitted successfully:', data); // Debug log
         
-        // Update local state instead of refetching
+        // Update local state for immediate feedback (real-time will also update)
         if (data && data[0]) {
           updateReviewLocally(data[0], true);
         }
@@ -353,18 +445,24 @@ const FacultyDetail: React.FC = () => {
         setComment('');
         setRating(0);
         setSelectedCourse('');
-        alert('Review submitted successfully!');
+        
+        // Success toast
+        toast.success('Review submitted successfully!', {
+          description: 'Your review has been posted and is now visible to others.'
+        });
       }
     } catch (err) {
       console.error('Review submission error:', err);
-      alert('An error occurred while submitting your review. Please try again.');
+      toast.error('An error occurred', {
+        description: 'Please try again or contact support if the problem persists.'
+      });
     }
   };
 
   // Upvote/Downvote with user tracking (NO MULTIPLE VOTES ALLOWED)
   const handleVote = async (review: Review, type: 'upvote' | 'downvote') => {
     if (!user) {
-      alert('Please sign in to vote on reviews.');
+      toast.error('Please sign in to vote on reviews.');
       return;
     }
     
@@ -405,7 +503,7 @@ const FacultyDetail: React.FC = () => {
         
         if (deleteError) {
           console.error('Delete vote error:', deleteError);
-          alert('Failed to remove vote. Please try again.');
+          toast.error('Failed to remove vote. Please try again.');
           return;
         } else {
         }
@@ -577,7 +675,7 @@ const FacultyDetail: React.FC = () => {
         const { error: insertError2 } = await supabase.from('review_votes').insert([voteData]);
         if (insertError2) {
           console.error('Second insert attempt failed:', insertError2);
-          alert('Failed to register vote. Please try again.');
+          toast.error('Failed to register vote. Please try again.');
           return;
         }
       }
@@ -621,7 +719,7 @@ const FacultyDetail: React.FC = () => {
       
       if (updateError) {
         console.error('Update vote count error:', updateError);
-        alert('Failed to update vote count. Please try again.');
+        toast.error('Failed to update vote count. Please try again.');
       } else {
         
         // Update local state instead of refetching
@@ -674,19 +772,19 @@ const FacultyDetail: React.FC = () => {
       }
     } catch (err) {
       console.error('Vote error:', err);
-      alert('An error occurred while voting. Please try again.');
+      toast.error('An error occurred while voting. Please try again.');
     }
   };
 
   // Reply submission fix
   const handleReply = async (parent: Review) => {
     if (!replyText.trim()) {
-      alert('Please write a reply before submitting.');
+      toast.error('Please write a reply before submitting.');
       return;
     }
     
     if (!user) {
-      alert('Please sign in to post a reply.');
+      toast.error('Please sign in to post a reply.');
       return;
     }
     
@@ -725,10 +823,12 @@ const FacultyDetail: React.FC = () => {
       
       if (error) {
         console.error('Reply submission error:', error);
-        alert(`Failed to submit reply: ${error.message}`);
+        toast.error('Failed to submit reply', {
+          description: error.message
+        });
       } else {
         
-        // Update local state instead of refetching
+        // Update local state for immediate feedback (real-time will also update)
         if (data && data[0]) {
           updateReplyLocally(parent, data[0]);
         }
@@ -737,11 +837,16 @@ const FacultyDetail: React.FC = () => {
         setReplyingToUser(null);
         setReplyingToType(null);
         setReplyText('');
-        alert('Reply posted successfully!');
+        
+        toast.success('Reply posted successfully!', {
+          description: 'Your reply has been added to the conversation.'
+        });
       }
     } catch (err) {
       console.error('Reply submission error:', err);
-      alert('An error occurred while submitting your reply. Please try again.');
+      toast.error('An error occurred', {
+        description: 'Please try again or contact support if the problem persists.'
+      });
     }
   };
 
@@ -754,11 +859,13 @@ const FacultyDetail: React.FC = () => {
       if (confirmed) {
         // Here you could insert into a reports table
         // await supabase.from('reports').insert([{...}]);
-        alert('Review reported successfully. Moderators will review it.');
+        toast.success('Review reported successfully', {
+          description: 'Moderators will review it.'
+        });
       }
     } catch (err) {
       console.error('Report error:', err);
-      alert('Failed to report review.');
+      toast.error('Failed to report review.');
     }
   };
 
@@ -774,12 +881,12 @@ const FacultyDetail: React.FC = () => {
     });
     
     if (!editText.trim()) {
-      alert('Please write a review comment.');
+      toast.error('Please write a review comment.');
       return;
     }
     
     if (!user || user.email !== review.user_email) {
-      alert('You can only edit your own reviews.');
+      toast.error('You can only edit your own reviews.');
       return;
     }
     
@@ -822,7 +929,9 @@ const FacultyDetail: React.FC = () => {
       
       if (error) {
         console.error('Edit review error:', error);
-        alert(`Failed to update review: ${error.message}`);
+        toast.error('Failed to update review', {
+          description: error.message
+        });
       } else {
         
         // Update local state instead of refetching
@@ -843,24 +952,37 @@ const FacultyDetail: React.FC = () => {
         setEditingReview(null);
         setEditText('');
         setEditRating(0);
-        alert('Review updated successfully!');
+        toast.success('Review updated successfully!', {
+          description: 'Your changes have been saved.'
+        });
       }
     } catch (err) {
       console.error('Edit review error:', err);
-      alert('An error occurred while updating your review. Please try again.');
+      toast.error('An error occurred while updating your review. Please try again.');
     }
   };
 
   // Delete review handler
-  const handleDeleteReview = async (review: Review) => {
-    if (!user || user.email !== review.user_email) {
-      alert('You can only delete your own reviews.');
+  // Handle delete confirmation dialog
+  const handleDeleteClick = (review: Review) => {
+    if (!user || review.user_email !== user.email) {
+      toast.error('You can only delete your own reviews.');
       return;
     }
+    setReviewToDelete(review);
+    setDeleteConfirmOpen(true);
+  };
+
+  // Confirm delete and execute
+  const confirmDeleteReview = async () => {
+    if (!reviewToDelete) return;
     
-    const confirmed = confirm('Are you sure you want to delete this review? This action cannot be undone.');
-    if (!confirmed) return;
-    
+    await handleDeleteReview(reviewToDelete);
+    setDeleteConfirmOpen(false);
+    setReviewToDelete(null);
+  };
+
+  const handleDeleteReview = async (review: Review) => {
     try {
       console.log('Deleting review:', {
         faculty_initial: review.faculty_initial,
@@ -910,7 +1032,9 @@ const FacultyDetail: React.FC = () => {
       
       if (error) {
         console.error('Delete review error:', error);
-        alert(`Failed to delete review: ${error.message}`);
+        toast.error('Failed to delete review', {
+          description: error.message
+        });
       } else {
         
         // Update local state instead of refetching
@@ -930,11 +1054,13 @@ const FacultyDetail: React.FC = () => {
           return newVotes;
         });
         
-        alert('Review deleted successfully!');
+        toast.success('Review deleted successfully!', {
+          description: 'Your review has been removed.'
+        });
       }
     } catch (err) {
       console.error('Delete review error:', err);
-      alert('An error occurred while deleting your review. Please try again.');
+      toast.error('An error occurred while deleting your review. Please try again.');
     }
   };
 
@@ -1294,7 +1420,7 @@ const FacultyDetail: React.FC = () => {
                           
                           <button 
                             className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-2 bg-slate-100 hover:bg-red-100 text-slate-600 hover:text-red-600 dark:bg-slate-700 dark:hover:bg-red-900 dark:text-slate-400 dark:hover:text-red-300 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 hover:shadow-md text-xs sm:text-sm"
-                            onClick={() => handleDeleteReview(review)}
+                            onClick={() => handleDeleteClick(review)}
                           >
                             <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
                             Delete
@@ -1613,7 +1739,7 @@ const FacultyDetail: React.FC = () => {
                                     
                                     <button 
                                       className="flex items-center gap-1 px-2 py-1 bg-slate-200 hover:bg-red-200 text-slate-600 hover:text-red-600 dark:bg-slate-600 dark:hover:bg-red-800 dark:text-slate-400 dark:hover:text-red-300 rounded text-sm transition-all"
-                                      onClick={() => handleDeleteReview(reply)}
+                                      onClick={() => handleDeleteClick(reply)}
                                     >
                                       <Trash2 className="h-3 w-3" />
                                       Delete
@@ -1706,6 +1832,28 @@ const FacultyDetail: React.FC = () => {
     </div>
   )}
       </div>
+      
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Review</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this {reviewToDelete?.parent_faculty_initial ? 'reply' : 'review'}? 
+              This action cannot be undone and will remove all associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteReview}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
