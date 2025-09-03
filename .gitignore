@@ -10,12 +10,31 @@ node_modules/
 dist/
 build/
 
-# Environment variables
+# Environment variables - CRITICAL SECURITY
 .env
+.env.*
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+.env.production
+.env.development
+.env.test
+*.env
+env.js
+env.ts
+
+# API Keys and Secrets - NEVER COMMIT THESE
+**/config/keys.js
+**/config/prod.js
+**/config/dev.js
+**/*secret*
+**/*key*
+**/*token*
+**/*credential*
+*supabase-key*
+*api-key*
+*private-key*
 
 # IDE and editor files
 .vscode/
