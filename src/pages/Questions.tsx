@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,9 @@ import {
   FileText, 
   Plus,
   Upload, 
-  Users
+  Users,
+  Search,
+  Trash2
 } from "lucide-react";
 
 import { useAuth } from "@/contexts/AuthContext";
@@ -44,6 +46,8 @@ interface QuestionPaper {
   uploaded_by_email: string;
   uploaded_by_name: string;
   is_approved: boolean;
+  file_blob?: File; // For local blob storage
+  storage_path?: string; // For Supabase storage path
 }
 
 const Questions = () => {
@@ -53,6 +57,9 @@ const Questions = () => {
   const [loading, setLoading] = useState(true);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [selectedCourseForUpload, setSelectedCourseForUpload] = useState<string>("");
+  const [isSpecificCourseUpload, setIsSpecificCourseUpload] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const blobUrls = useRef<string[]>([]); // Track blob URLs for cleanup
   const [uploadData, setUploadData] = useState({
     title: "",
     semester: "",
@@ -62,92 +69,89 @@ const Questions = () => {
   });
 
   useEffect(() => {
-    fetchData();
+    initializeData();
+    
+    // Cleanup function to revoke blob URLs on unmount
+    return () => {
+      blobUrls.current.forEach(url => {
+        URL.revokeObjectURL(url);
+      });
+    };
   }, []);
 
-  const fetchData = async () => {
+  const initializeData = async () => {
     try {
-      console.log('Fetching courses and papers...');
+      console.log('🔄 initializeData called - this will clear all papers!');
+      setLoading(true);
       
-      // For now, use mock data since database might have issues
-      const mockCourses = [
-        { id: '1', course_code: 'CSE110', course_name: 'Programming Language I', category_id: '1' },
-        { id: '2', course_code: 'CSE111', course_name: 'Programming Language II', category_id: '1' },
-        { id: '3', course_code: 'MAT110', course_name: 'Mathematics', category_id: '2' },
-        { id: '4', course_code: 'PHY111', course_name: 'Physics I', category_id: '3' },
-        { id: '5', course_code: 'ENG101', course_name: 'English', category_id: '4' },
-        { id: '6', course_code: 'CSE220', course_name: 'Data Structures', category_id: '1' }
+      // Complete CSE course list
+      const sampleCourses = [
+        { id: '1', course_code: 'CSE101', course_name: 'Introduction to Computer Science', category_id: '1' },
+        { id: '2', course_code: 'CSE110', course_name: 'Programming Language I', category_id: '1' },
+        { id: '3', course_code: 'CSE111', course_name: 'Programming Language II', category_id: '1' },
+        { id: '4', course_code: 'CSE220', course_name: 'Data Structures', category_id: '1' },
+        { id: '5', course_code: 'CSE221', course_name: 'Algorithms', category_id: '1' },
+        { id: '6', course_code: 'CSE230', course_name: 'Discrete Mathematics', category_id: '1' },
+        { id: '7', course_code: 'CSE250', course_name: 'Circuits and Electronics', category_id: '1' },
+        { id: '8', course_code: 'CSE251', course_name: 'Electronic Devices and Circuits', category_id: '1' },
+        { id: '9', course_code: 'CSE260', course_name: 'Digital Logic Design', category_id: '1' },
+        { id: '10', course_code: 'CSE310', course_name: 'Object-Oriented Programming', category_id: '1' },
+        { id: '11', course_code: 'CSE320', course_name: 'Data Communications', category_id: '1' },
+        { id: '12', course_code: 'CSE321', course_name: 'Operating System', category_id: '1' },
+        { id: '13', course_code: 'CSE330', course_name: 'Numerical Methods', category_id: '1' },
+        { id: '14', course_code: 'CSE331', course_name: 'Automata and Computability', category_id: '1' },
+        { id: '15', course_code: 'CSE340', course_name: 'Computer Architecture', category_id: '1' },
+        { id: '16', course_code: 'CSE341', course_name: 'Microprocessors', category_id: '1' },
+        { id: '17', course_code: 'CSE342', course_name: 'Computer Systems Engineering', category_id: '1' },
+        { id: '18', course_code: 'CSE350', course_name: 'Digital Electronics and Pulse Techniques', category_id: '1' },
+        { id: '19', course_code: 'CSE360', course_name: 'Computer Interfacing', category_id: '1' },
+        { id: '20', course_code: 'CSE370', course_name: 'Database Systems', category_id: '1' },
+        { id: '21', course_code: 'CSE371', course_name: 'Management Information Systems', category_id: '1' },
+        { id: '22', course_code: 'CSE390', course_name: 'Technical Communication', category_id: '1' },
+        { id: '23', course_code: 'CSE391', course_name: 'Programming for the Internet', category_id: '1' },
+        { id: '24', course_code: 'CSE392', course_name: 'Signals and Systems', category_id: '1' },
+        { id: '25', course_code: 'CSE410', course_name: 'Advance Programming In UNIX', category_id: '1' },
+        { id: '26', course_code: 'CSE419', course_name: 'Programming Languages and Competitive Programming', category_id: '1' },
+        { id: '27', course_code: 'CSE420', course_name: 'Compiler Design', category_id: '1' },
+        { id: '28', course_code: 'CSE421', course_name: 'Computer Networks', category_id: '1' },
+        { id: '29', course_code: 'CSE422', course_name: 'Artificial Intelligence', category_id: '1' },
+        { id: '30', course_code: 'CSE423', course_name: 'Computer Graphics', category_id: '1' },
+        { id: '31', course_code: 'CSE424', course_name: 'Pattern Recognition', category_id: '1' },
+        { id: '32', course_code: 'CSE425', course_name: 'Neural Networks', category_id: '1' },
+        { id: '33', course_code: 'CSE426', course_name: 'Advanced Algorithms', category_id: '1' },
+        { id: '34', course_code: 'CSE427', course_name: 'Machine Learning', category_id: '1' },
+        { id: '35', course_code: 'CSE428', course_name: 'Image Processing', category_id: '1' },
+        { id: '36', course_code: 'CSE429', course_name: 'Basic Multimedia Theory', category_id: '1' },
+        { id: '37', course_code: 'CSE430', course_name: 'Digital Signal Processing', category_id: '1' },
+        { id: '38', course_code: 'CSE431', course_name: 'Natural Language Processing', category_id: '1' },
+        { id: '39', course_code: 'CSE432', course_name: 'Speech Recognition and Synthesis', category_id: '1' },
+        { id: '40', course_code: 'CSE460', course_name: 'VLSI Design', category_id: '1' },
+        { id: '41', course_code: 'CSE461', course_name: 'Introduction to Robotics', category_id: '1' },
+        { id: '42', course_code: 'CSE462', course_name: 'Fault-Tolerant Systems', category_id: '1' },
+        { id: '43', course_code: 'CSE470', course_name: 'Software Engineering', category_id: '1' },
+        { id: '44', course_code: 'CSE471', course_name: 'Systems Analysis and Design', category_id: '1' },
+        { id: '45', course_code: 'CSE472', course_name: 'Human-Computer Interface', category_id: '1' },
+        { id: '46', course_code: 'CSE473', course_name: 'Financial Engineering & Technology', category_id: '1' },
+        { id: '47', course_code: 'CSE474', course_name: 'Simulation and Modeling', category_id: '1' },
+        { id: '48', course_code: 'CSE490', course_name: 'Special Topics', category_id: '1' },
+        { id: '49', course_code: 'CSE491', course_name: 'Independent Study', category_id: '1' }
       ];
 
-      const mockPapers = [
-        {
-          id: '1',
-          title: 'Midterm Fall 2023',
-          course_code: 'CSE110',
-          course_name: 'Programming Language I',
-          semester: 'Fall',
-          year: 2023,
-          exam_type: 'midterm' as const,
-          file_url: 'https://example.com/cse110-midterm-fall2023.pdf',
-          file_name: 'cse110-midterm-fall2023.pdf',
-          uploaded_at: '2023-10-15',
-          uploaded_by_email: 'student@bracu.ac.bd',
-          uploaded_by_name: 'Student',
-          is_approved: true
-        },
-        {
-          id: '2',
-          title: 'Final Spring 2023',
-          course_code: 'CSE110',
-          course_name: 'Programming Language I',
-          semester: 'Spring',
-          year: 2023,
-          exam_type: 'final' as const,
-          file_url: 'https://example.com/cse110-final-spring2023.pdf',
-          file_name: 'cse110-final-spring2023.pdf',
-          uploaded_at: '2023-05-20',
-          uploaded_by_email: 'student@bracu.ac.bd',
-          uploaded_by_name: 'Student',
-          is_approved: true
-        },
-        {
-          id: '3',
-          title: 'Quiz 1 Summer 2023',
-          course_code: 'CSE111',
-          course_name: 'Programming Language II',
-          semester: 'Summer',
-          year: 2023,
-          exam_type: 'quiz' as const,
-          file_url: 'https://example.com/cse111-quiz1-summer2023.pdf',
-          file_name: 'cse111-quiz1-summer2023.pdf',
-          uploaded_at: '2023-07-10',
-          uploaded_by_email: 'student@bracu.ac.bd',
-          uploaded_by_name: 'Student',
-          is_approved: true
-        },
-        {
-          id: '4',
-          title: 'Assignment 1',
-          course_code: 'MAT110',
-          course_name: 'Mathematics',
-          semester: 'Fall',
-          year: 2023,
-          exam_type: 'assignment' as const,
-          file_url: 'https://example.com/mat110-assignment1-fall2023.pdf',
-          file_name: 'mat110-assignment1-fall2023.pdf',
-          uploaded_at: '2023-09-15',
-          uploaded_by_email: 'student@bracu.ac.bd',
-          uploaded_by_name: 'Student',
-          is_approved: true
-        }
-      ];
-
-      setCourses(mockCourses);
-      setQuestionPapers(mockPapers);
+      setCourses(sampleCourses);
+      // Load existing papers from localStorage
+      const savedPapers = localStorage.getItem('questionPapers');
+      if (savedPapers) {
+        const papers = JSON.parse(savedPapers);
+        console.log('📁 Loaded', papers.length, 'papers from localStorage');
+        setQuestionPapers(papers);
+      } else {
+        console.log('📭 No saved papers found, starting empty');
+        setQuestionPapers([]);
+      }
       
     } catch (error) {
-      console.error('Error fetching data:', error);
-      toast.error(`Failed to load data: ${error.message}`);
+      console.error('Error initializing data:', error);
+      toast.error('Failed to load data');
     } finally {
       setLoading(false);
     }
@@ -157,6 +161,12 @@ const Questions = () => {
   const getPapersForCourse = (courseCode: string) => {
     return questionPapers.filter(paper => paper.course_code === courseCode);
   };
+
+  // Filter courses based on search
+  const filteredCourses = courses.filter(course => 
+    course.course_code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    course.course_name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   // Handle upload
   const handleUpload = async () => {
@@ -171,6 +181,52 @@ const Questions = () => {
     }
 
     try {
+      // Generate unique file name
+      const fileExt = uploadData.file.name.split('.').pop();
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `question-papers/${fileName}`;
+      
+      // Try to upload to Supabase Storage (if configured)
+      let fileUrl = '';
+      let isSupabaseUpload = false;
+      
+      try {
+        console.log('Attempting Supabase upload...', { filePath, fileName: uploadData.file.name });
+        
+        // Debug Supabase connection
+        console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
+        console.log('Supabase Key exists:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
+        
+        // Note: Anon users can't list buckets, but can upload to them if policies allow
+        
+        const { data, error } = await supabase.storage
+          .from('question-papers')
+          .upload(filePath, uploadData.file);
+          
+        console.log('Supabase upload result:', { data, error });
+          
+        if (!error && data) {
+          // Get public URL
+          const { data: urlData } = supabase.storage
+            .from('question-papers')
+            .getPublicUrl(filePath);
+          
+          console.log('Public URL result:', urlData);
+          fileUrl = urlData.publicUrl;
+          isSupabaseUpload = true;
+          toast.success('File uploaded to cloud storage successfully!');
+        } else {
+          throw new Error(`Supabase upload failed: ${error?.message || 'Unknown error'}`);
+        }
+      } catch (supabaseError) {
+        // Fallback to blob URL for local storage
+        console.error('Supabase error details:', supabaseError);
+        toast.error(`Supabase failed: ${supabaseError.message}`);
+        fileUrl = URL.createObjectURL(uploadData.file);
+        blobUrls.current.push(fileUrl);
+        toast.success('File uploaded successfully!');
+      }
+      
       // Create new paper object
       const newPaper = {
         id: Date.now().toString(),
@@ -180,16 +236,23 @@ const Questions = () => {
         semester: uploadData.semester,
         year: uploadData.year,
         exam_type: uploadData.exam_type,
-        file_url: 'https://example.com/placeholder.pdf',
+        file_url: fileUrl,
         file_name: uploadData.file.name,
         uploaded_at: new Date().toISOString(),
         uploaded_by_email: user.email,
         uploaded_by_name: user.name || user.email,
-        is_approved: true
+        is_approved: true,
+        file_blob: isSupabaseUpload ? undefined : uploadData.file, // Only store blob for local files
+        storage_path: isSupabaseUpload ? filePath : undefined // Track Supabase path for deletion
       };
 
-      // Add to local state
-      setQuestionPapers(prev => [newPaper, ...prev]);
+      // Add to local state AND save to localStorage for persistence
+      setQuestionPapers(prev => {
+        const updated = [newPaper, ...prev];
+        // Save to localStorage so files survive page refresh
+        localStorage.setItem('questionPapers', JSON.stringify(updated));
+        return updated;
+      });
 
       toast.success('Question paper uploaded successfully!');
       setUploadDialogOpen(false);
@@ -201,25 +264,93 @@ const Questions = () => {
         file: null
       });
       setSelectedCourseForUpload("");
+      setIsSpecificCourseUpload(false);
       
     } catch (error) {
       console.error('Error uploading:', error);
-      toast.error(`Failed to upload: ${error.message}`);
+      toast.error('Failed to upload paper');
     }
   };
 
   const handleDownload = (paper: QuestionPaper) => {
-    window.open(paper.file_url, '_blank');
-    toast.success('Opening document...');
+    try {
+      console.log('Starting download for:', {
+        fileName: paper.file_name,
+        fileUrl: paper.file_url,
+        storagePath: paper.storage_path,
+        isBlob: paper.file_url.startsWith('blob:')
+      });
+      
+      // Open in new tab and trigger download
+      window.open(paper.file_url, '_blank');
+      
+      console.log('Download opened in new tab');
+      toast.success(`Opening ${paper.file_name} in new tab...`);
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error('Failed to download file');
+    }
+  };
+
+  const handleDelete = async (paper: QuestionPaper) => {
+    if (!user) {
+      toast.error('Please sign in to delete files');
+      return;
+    }
+
+    // Check if user is the uploader
+    if (paper.uploaded_by_email !== user.email) {
+      toast.error('You can only delete files you uploaded');
+      return;
+    }
+
+    // Confirm deletion
+    if (window.confirm(`Are you sure you want to delete "${paper.title}"?`)) {
+      try {
+        // Delete from Supabase storage if it's stored there
+        if (paper.storage_path) {
+          const { error } = await supabase.storage
+            .from('question-papers')
+            .remove([paper.storage_path]);
+          
+          if (error) {
+            console.error('Supabase delete error:', error);
+            // Continue with local deletion even if cloud deletion fails
+          }
+        }
+        
+        // Revoke blob URL if it's a local blob
+        if (paper.file_blob && paper.file_url.startsWith('blob:')) {
+          URL.revokeObjectURL(paper.file_url);
+          // Remove from tracked URLs
+          blobUrls.current = blobUrls.current.filter(url => url !== paper.file_url);
+        }
+        
+        // Remove from state AND localStorage
+        console.log('Removing paper from state:', paper.id);
+        setQuestionPapers(prev => {
+          const newPapers = prev.filter(p => p.id !== paper.id);
+          // Update localStorage after deletion
+          localStorage.setItem('questionPapers', JSON.stringify(newPapers));
+          console.log('Papers after deletion:', newPapers.length);
+          return newPapers;
+        });
+        
+        toast.success('File deleted successfully');
+      } catch (error) {
+        console.error('Delete error:', error);
+        toast.error('Failed to delete file');
+      }
+    }
   };
 
   const getExamTypeBadgeColor = (examType: string) => {
     switch (examType) {
-      case 'midterm': return 'bg-blue-100 text-blue-800';
-      case 'final': return 'bg-red-100 text-red-800';
-      case 'quiz': return 'bg-green-100 text-green-800';
-      case 'assignment': return 'bg-purple-100 text-purple-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'midterm': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+      case 'final': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+      case 'quiz': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+      case 'assignment': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
     }
   };
 
@@ -262,7 +393,7 @@ const Questions = () => {
         <div className="max-w-6xl mx-auto">
           {/* Header Section */}
           <div className="mb-8">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
               <div>
                 <h1 className="text-4xl font-bold mb-2 flex items-center gap-3">
                   <Archive className="h-10 w-10 text-primary" />
@@ -275,7 +406,10 @@ const Questions = () => {
               
               <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button size="lg" className="flex items-center gap-2">
+                  <Button size="lg" className="flex items-center gap-2" onClick={() => {
+                    setIsSpecificCourseUpload(false);
+                    setSelectedCourseForUpload("");
+                  }}>
                     <Upload className="h-5 w-5" />
                     Upload Paper
                   </Button>
@@ -290,24 +424,33 @@ const Questions = () => {
                   <div className="space-y-4">
                     <div>
                       <Label htmlFor="course_select">Course</Label>
-                      <Select value={selectedCourseForUpload} onValueChange={setSelectedCourseForUpload}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a course" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {courses.map(course => (
-                            <SelectItem key={course.id} value={course.course_code}>
-                              {course.course_code} - {course.course_name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      {isSpecificCourseUpload ? (
+                        <div className="flex items-center p-2 border rounded-md bg-muted">
+                          <BookOpen className="h-4 w-4 mr-2 text-muted-foreground" />
+                          <span className="font-medium">
+                            {selectedCourseForUpload} - {courses.find(c => c.course_code === selectedCourseForUpload)?.course_name}
+                          </span>
+                        </div>
+                      ) : (
+                        <Select value={selectedCourseForUpload} onValueChange={setSelectedCourseForUpload}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a course" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {courses.map(course => (
+                              <SelectItem key={course.id} value={course.course_code}>
+                                {course.course_code} - {course.course_name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
                     </div>
                     <div>
                       <Label htmlFor="title">Title</Label>
                       <Input
                         id="title"
-                        placeholder="e.g., Midterm Fall 2023"
+                        placeholder="e.g., Midterm Fall 2024"
                         value={uploadData.title}
                         onChange={(e) => setUploadData({ ...uploadData, title: e.target.value })}
                       />
@@ -375,11 +518,22 @@ const Questions = () => {
                 </DialogContent>
               </Dialog>
             </div>
+
+            {/* Search Bar */}
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search courses..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
           </div>
 
           {/* Course Boxes Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {courses.map((course) => {
+            {filteredCourses.map((course) => {
               const coursePapers = getPapersForCourse(course.course_code);
               return (
                 <Card key={course.id} className="hover:shadow-lg transition-shadow">
@@ -415,19 +569,33 @@ const Questions = () => {
                                   <Badge className={getExamTypeBadgeColor(paper.exam_type)} variant="secondary">
                                     {paper.exam_type}
                                   </Badge>
-                                  <span className="text-xs text-muted-foreground">
-                                    {paper.semester} {paper.year}
-                                  </span>
+                                  <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                                    {paper.year}
+                                  </Badge>
+                                  <Badge variant="outline" className={`text-xs ${paper.semester === 'Summer' ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-purple-50 text-purple-700 border-purple-200'}`}>
+                                    {paper.semester}
+                                  </Badge>
                                 </div>
                               </div>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleDownload(paper)}
-                                className="ml-2 flex-shrink-0"
-                              >
-                                <Download className="h-4 w-4" />
-                              </Button>
+                              <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleDownload(paper)}
+                                >
+                                  <Download className="h-4 w-4" />
+                                </Button>
+                                {user && paper.uploaded_by_email === user.email && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleDelete(paper)}
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
                             </div>
                           ))}
                           {coursePapers.length > 3 && (
@@ -448,6 +616,7 @@ const Questions = () => {
                         className="w-full" 
                         onClick={() => {
                           setSelectedCourseForUpload(course.course_code);
+                          setIsSpecificCourseUpload(true);
                           setUploadDialogOpen(true);
                         }}
                       >
@@ -460,6 +629,19 @@ const Questions = () => {
               );
             })}
           </div>
+
+          {filteredCourses.length === 0 && searchQuery && (
+            <div className="text-center py-12">
+              <Archive className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
+              <h3 className="text-xl font-semibold mb-2">No courses found</h3>
+              <p className="text-muted-foreground mb-4">
+                Try adjusting your search term or browse all available courses.
+              </p>
+              <Button onClick={() => setSearchQuery("")} variant="outline">
+                Clear Search
+              </Button>
+            </div>
+          )}
         </div>
       </main>
 

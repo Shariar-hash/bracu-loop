@@ -36,6 +36,13 @@ env.ts
 *api-key*
 *private-key*
 
+# Database and SQL files with sensitive data
+*_FIX.sql
+*DISABLE*.sql
+debug_*.sql
+setup-database.js
+test-db.js
+
 # IDE and editor files
 .vscode/
 .idea/
