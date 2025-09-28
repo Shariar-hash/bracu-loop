@@ -577,22 +577,23 @@ const Questions = () => {
                                   </Badge>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                              <div className="flex items-center gap-1 ml-2 flex-shrink-0 sm:gap-2">
                                 <Button
                                   size="sm"
                                   variant="ghost"
+                                  className="p-1 sm:p-2"
                                   onClick={() => handleDownload(paper)}
                                 >
-                                  <Download className="h-4 w-4" />
+                                  <Download className="h-3 w-3 sm:h-4 sm:w-4" />
                                 </Button>
                                 {user && paper.uploaded_by_email === user.email && (
                                   <Button
                                     size="sm"
                                     variant="ghost"
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50 p-1 sm:p-2"
                                     onClick={() => handleDelete(paper)}
-                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
                                   >
-                                    <Trash2 className="h-4 w-4" />
+                                    <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
                                   </Button>
                                 )}
                               </div>
