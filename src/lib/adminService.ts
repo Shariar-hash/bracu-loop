@@ -539,17 +539,14 @@ class AdminService {
   // COURSES MANAGEMENT (using direct table queries)
   static async getCourses(): Promise<Course[]> {
     try {
-      console.log('🔍 AdminService.getCourses - Loading courses from database...');
-      
       // First try with ordering
       try {
         const { data, error } = await supabase
           .from('courses')
           .select('*')
-          .order('created_at', { ascending: false });
+          .order('course_code', { ascending: true });
 
         if (error) {
-          console.log('⚠️ Ordered query failed, trying without ordering...', error);
           
           // Fallback: try without ordering
           const { data: fallbackData, error: fallbackError } = await supabase
@@ -557,46 +554,39 @@ class AdminService {
             .select('*');
             
           if (fallbackError) {
-            console.error('❌ Database error loading courses (fallback):', fallbackError);
             throw fallbackError;
           }
           
-          console.log('✅ Courses loaded successfully (fallback):', fallbackData?.length || 0, 'records');
-          return fallbackData || [];
+          // Sort by course_code alphabetically
+          const sortedFallbackData = (fallbackData || []).sort((a, b) => a.course_code.localeCompare(b.course_code));
+          return sortedFallbackData;
         }
         
-        console.log('✅ Courses loaded successfully (ordered):', data?.length || 0, 'records');
         return data || [];
         
       } catch (orderError) {
-        console.log('⚠️ Ordering failed, trying simple select...', orderError);
-        
         // Final fallback: simple select
         const { data: simpleData, error: simpleError } = await supabase
           .from('courses')
           .select('*');
           
         if (simpleError) {
-          console.error('❌ Simple query also failed:', simpleError);
           throw simpleError;
         }
         
-        console.log('✅ Courses loaded successfully (simple):', simpleData?.length || 0, 'records');
-        return simpleData || [];
+        // Sort by course_code alphabetically
+        const sortedSimpleData = (simpleData || []).sort((a, b) => a.course_code.localeCompare(b.course_code));
+        return sortedSimpleData;
       }
       
     } catch (error) {
-      console.error('❌ AdminService.getCourses - Complete failure:', error);
       return [];
     }
   }
 
   static async addCourse(courseData: Partial<Course> & { assigned_faculty?: string[] }): Promise<Course> {
     try {
-      console.log('📚 AdminService.addCourse - Input data:', courseData);
-      
       // Note: Faculty assignment is now optional - courses can be created without faculty
-      console.log('📚 Faculty assignment is optional:', courseData.assigned_faculty?.length || 0, 'faculty assigned');
       
       const newCourseData = {
         course_code: courseData.course_code,
@@ -613,38 +603,28 @@ class AdminService {
         .select()
         .single();
 
-      console.log('📚 Database response - data:', data);
-      console.log('📚 Database response - error:', error);
-
       if (error) {
-        console.error('❌ Database error adding course:', error);
         throw new Error(`Database error: ${error.message} (Code: ${error.code})`);
       }
       
       // Handle faculty assignments if provided
       if (courseData.assigned_faculty && courseData.assigned_faculty.length > 0) {
-        console.log('👨‍🏫 Assigning faculty to course:', courseData.assigned_faculty);
         try {
           await this.updateFacultyCourses(courseData.assigned_faculty, data.course_code, 'add');
-          console.log('✅ Faculty assignments completed successfully');
         } catch (facultyError) {
-          console.error('⚠️ Course added but faculty assignment failed:', facultyError);
           // Don't throw error here - course was created successfully
           // The admin can manually assign faculty later if needed
         }
       }
       
-      console.log('✅ Course added successfully:', data);
       return data;
     } catch (error) {
-      console.error('❌ Error in addCourse:', error);
       throw error instanceof Error ? error : new Error('Failed to add course');
     }
   }
 
   static async getCourseFaculty(courseCode: string): Promise<Faculty[]> {
     try {
-      console.log('👨‍🏫 AdminService.getCourseFaculty - Getting faculty for course:', courseCode);
       
       const { data, error } = await supabase
         .from('faculties')
