@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { toast } from 'sonner';
+import AdminService from '@/lib/adminService';
 
 // Define types for Google credential response
 interface CredentialResponse {
@@ -58,22 +59,75 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing user in localStorage
-    const savedUser = localStorage.getItem('bracu-loop-user');
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch (error) {
-        localStorage.removeItem('bracu-loop-user');
+    // Check for existing user in localStorage and verify they're not banned
+    const checkAndLoadUser = async () => {
+      const savedUser = localStorage.getItem('bracu-loop-user');
+      if (savedUser) {
+        try {
+          const userData = JSON.parse(savedUser);
+          
+          // Check if user is banned
+          try {
+            const banStatus = await AdminService.checkUserBanStatus(userData.email);
+            
+            if (banStatus.isBanned) {
+              let banMessage = `Your account has been ${banStatus.banDuration === 'permanent' ? 'permanently banned' : 'suspended'}`;
+              if (banStatus.reason) {
+                banMessage += `\nReason: ${banStatus.reason}`;
+              }
+              
+              toast.error(banMessage, { 
+                duration: 10000,
+                description: 'You have been automatically signed out. Contact administrators if you believe this is an error.'
+              });
+              
+              localStorage.removeItem('bracu-loop-user');
+              setUser(null);
+              setIsLoading(false);
+              return;
+            }
+          } catch (error) {
+            console.warn('Could not check ban status on app load:', error);
+          }
+          
+          setUser(userData);
+        } catch (error) {
+          localStorage.removeItem('bracu-loop-user');
+        }
       }
-    }
-    setIsLoading(false);
+      setIsLoading(false);
+    };
+    
+    checkAndLoadUser();
   }, []);
 
-  const handleCredentialResponse = (response: CredentialResponse) => {
+  const handleCredentialResponse = async (response: CredentialResponse) => {
     const userData = decodeJWT(response.credential);
     
     if (userData) {
+      // Check if user is banned before allowing login
+      try {
+        const banStatus = await AdminService.checkUserBanStatus(userData.email);
+        
+        if (banStatus.isBanned) {
+          let banMessage = `Access denied! Your account has been ${banStatus.banDuration === 'permanent' ? 'permanently banned' : 'suspended'}`;
+          if (banStatus.reason) {
+            banMessage += `\nReason: ${banStatus.reason}`;
+          }
+          if (banStatus.banDuration && banStatus.banDuration !== 'permanent') {
+            banMessage += `\nDuration: ${banStatus.banDuration}`;
+          }
+          
+          toast.error(banMessage, { 
+            duration: 8000,
+            description: 'Contact administrators if you believe this is an error.'
+          });
+          return;
+        }
+      } catch (error) {
+        console.warn('Could not check ban status, allowing login:', error);
+      }
+      
       setUser(userData);
       localStorage.setItem('bracu-loop-user', JSON.stringify(userData));
       toast.success(`Welcome back, ${userData.name.split(' ')[0]}!`);

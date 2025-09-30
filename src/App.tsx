@@ -15,6 +15,9 @@ import Notes from "./pages/Notes";
 import Questions from "./pages/Questions";
 import Suggestions from "./pages/Suggestions";
 import RoomFinder from "./pages/RoomFinder";
+import AdminDashboard from "./pages/AdminDashboard";
+import ContactPage from "./pages/ContactPage";
+import AdminDiagnostic from "./pages/AdminDiagnostic";
 
 const queryClient = new QueryClient();
 
@@ -60,6 +63,13 @@ const App = () => (
               
               {/* Public route - no authentication required */}
               <Route path="/roomfinder" element={<RoomFinder />} />
+              
+              {/* Student contact form */}
+              <Route path="/contact" element={<ContactPage />} />
+              
+              {/* Admin route - diagnostic first, then full-featured dashboard */}
+              <Route path="/admin" element={<AdminDiagnostic />} />
+              <Route path="/admin/dashboard" element={<AdminDashboard />} />
               
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />

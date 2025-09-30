@@ -2,7 +2,14 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
 import { supabase } from "@/lib/supabaseClient";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -277,6 +284,18 @@ const Suggestions = () => {
   const [replyingToUser, setReplyingToUser] = useState<string | null>(null); // user we're replying to
   const [editingComment, setEditingComment] = useState<string | null>(null); // comment/reply ID being edited
   const [editCommentContent, setEditCommentContent] = useState("");
+
+  // Reporting modal state
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [contentToReport, setContentToReport] = useState<{
+    id: string;
+    type: 'post' | 'comment';
+    content: string;
+    author: string;
+    author_email: string;
+  } | null>(null);
+  const [reportReason, setReportReason] = useState('');
+  const [reportDescription, setReportDescription] = useState('');
   
   const { user } = useAuth();
 
@@ -636,11 +655,25 @@ const Suggestions = () => {
   };
 
   const reportPost = async (postId: string) => {
-    // Simple report system for now
-    if (window.confirm('Report this post as inappropriate?')) {
-      toast.success('Post reported. Thank you for keeping our community safe.');
-      // In a real app, this would send to moderation
+    if (!user) {
+      toast.error('Please login to report content');
+      return;
     }
+
+    // Find the post to report
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+
+    setContentToReport({
+      id: postId,
+      type: 'post',
+      content: post.content,
+      author: post.author_name,
+      author_email: post.author_email
+    });
+    setReportReason('');
+    setReportDescription('');
+    setReportModalOpen(true);
   };
 
   // Parse reply target from comment (like Faculty Review)
@@ -761,9 +794,82 @@ const Suggestions = () => {
   };
 
   const reportComment = async (commentId: string, authorName: string) => {
-    if (window.confirm(`Report comment by ${authorName} as inappropriate?`)) {
-      toast.success('Comment reported. Thank you for keeping our community safe.');
-      // In a real app, this would send to moderation
+    if (!user) {
+      toast.error('Please login to report content');
+      return;
+    }
+
+    // Find the comment to report across all posts
+    let commentToReport = null;
+    for (const postId of Object.keys(comments)) {
+      const postComments = comments[postId];
+      const findComment = (commentsList: Comment[]): Comment | null => {
+        for (const comment of commentsList) {
+          if (comment.id === commentId) return comment;
+          if (comment.replies) {
+            const found = findComment(comment.replies);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+      commentToReport = findComment(postComments);
+      if (commentToReport) break;
+    }
+
+    if (!commentToReport) return;
+
+    setContentToReport({
+      id: commentId,
+      type: 'comment',
+      content: commentToReport.content,
+      author: authorName,
+      author_email: commentToReport.author_email
+    });
+    setReportReason('');
+    setReportDescription('');
+    setReportModalOpen(true);
+  };
+
+  const submitReport = async () => {
+    if (!contentToReport || !user || !reportReason) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      console.log('Submitting report:', {
+        contentId: contentToReport.id,
+        type: contentToReport.type,
+        reason: reportReason,
+        description: reportDescription
+      });
+
+      // Use our reporting system to capture the actual content
+      const reportResult = await supabase.rpc('report_content', {
+        content_type_input: contentToReport.type === 'post' ? 'suggestion_post' : 'suggestion_comment',
+        content_id_input: contentToReport.id,
+        reason_input: reportReason,
+        description_input: reportDescription,
+        reporter_email_input: user.email,
+        reporter_name_input: user.name || user.email
+      });
+
+      if (reportResult.error) {
+        throw reportResult.error;
+      }
+
+      setReportModalOpen(false);
+      setContentToReport(null);
+      setReportReason('');
+      setReportDescription('');
+      
+      toast.success(`${contentToReport.type === 'post' ? 'Post' : 'Comment'} reported successfully`, {
+        description: 'Moderators will review this content shortly.'
+      });
+    } catch (err) {
+      console.error('Report error:', err);
+      toast.error(`Failed to report ${contentToReport.type}. Please try again.`);
     }
   };
 
@@ -1333,6 +1439,84 @@ const Suggestions = () => {
         </div>
       </main>
       <Footer />
+
+      {/* Report Content Dialog */}
+      <Dialog open={reportModalOpen} onOpenChange={setReportModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Flag className="h-5 w-5 text-red-500" />
+              Report {contentToReport?.type === 'post' ? 'Post' : 'Comment'}
+            </DialogTitle>
+            <DialogDescription>
+              Help us maintain a respectful community by reporting inappropriate content.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Content Preview */}
+            {contentToReport && (
+              <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border-l-4 border-red-500">
+                <div className="text-sm font-medium mb-1">Content being reported:</div>
+                <div className="text-sm text-slate-600 dark:text-slate-400 line-clamp-3 bg-white dark:bg-slate-700 p-2 rounded">
+                  "{contentToReport.content}"
+                </div>
+                <div className="text-xs text-slate-500 mt-1">
+                  By {contentToReport.author} ({contentToReport.author_email})
+                </div>
+              </div>
+            )}
+
+            {/* Report Reason */}
+            <div className="space-y-2">
+              <Label htmlFor="report-reason">Reason for reporting *</Label>
+              <Select value={reportReason} onValueChange={setReportReason}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a reason..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="spam">Spam or promotional content</SelectItem>
+                  <SelectItem value="harassment">Harassment or bullying</SelectItem>
+                  <SelectItem value="hate_speech">Hate speech or discrimination</SelectItem>
+                  <SelectItem value="inappropriate">Inappropriate or offensive content</SelectItem>
+                  <SelectItem value="misinformation">False or misleading information</SelectItem>
+                  <SelectItem value="personal_info">Sharing personal information</SelectItem>
+                  <SelectItem value="off_topic">Off-topic or irrelevant</SelectItem>
+                  <SelectItem value="other">Other violation</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Additional Details */}
+            <div className="space-y-2">
+              <Label htmlFor="report-description">Additional details (optional)</Label>
+              <Textarea
+                id="report-description"
+                placeholder="Please provide any additional context that would help our moderators understand the issue..."
+                value={reportDescription}
+                onChange={(e) => setReportDescription(e.target.value)}
+                className="min-h-[80px]"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setReportModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={submitReport}
+              disabled={!reportReason}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Submit Report
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

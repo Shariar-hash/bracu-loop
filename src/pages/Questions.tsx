@@ -6,14 +6,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { 
   Archive, 
   BookOpen, 
   Calendar, 
   Download, 
   FileText, 
+  Flag,
   Plus,
   Upload, 
   Users,
@@ -24,6 +26,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
+import AdminService from "@/lib/adminService";
 
 interface Course {
   id: string;
@@ -68,6 +71,12 @@ const Questions = () => {
     file: null as File | null
   });
 
+  // Reporting state
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [paperToReport, setPaperToReport] = useState<QuestionPaper | null>(null);
+  const [reportReason, setReportReason] = useState('');
+  const [reportDescription, setReportDescription] = useState('');
+
   useEffect(() => {
     initializeData();
     
@@ -81,63 +90,92 @@ const Questions = () => {
 
   const initializeData = async () => {
     try {
-      console.log('🔄 initializeData called - this will clear all papers!');
+      console.log('🔄 Initializing Questions data...');
       setLoading(true);
       
-      // Complete CSE course list
-      const sampleCourses = [
-        { id: '1', course_code: 'CSE101', course_name: 'Introduction to Computer Science', category_id: '1' },
-        { id: '2', course_code: 'CSE110', course_name: 'Programming Language I', category_id: '1' },
-        { id: '3', course_code: 'CSE111', course_name: 'Programming Language II', category_id: '1' },
-        { id: '4', course_code: 'CSE220', course_name: 'Data Structures', category_id: '1' },
-        { id: '5', course_code: 'CSE221', course_name: 'Algorithms', category_id: '1' },
-        { id: '6', course_code: 'CSE230', course_name: 'Discrete Mathematics', category_id: '1' },
-        { id: '7', course_code: 'CSE250', course_name: 'Circuits and Electronics', category_id: '1' },
-        { id: '8', course_code: 'CSE251', course_name: 'Electronic Devices and Circuits', category_id: '1' },
-        { id: '9', course_code: 'CSE260', course_name: 'Digital Logic Design', category_id: '1' },
-        { id: '10', course_code: 'CSE310', course_name: 'Object-Oriented Programming', category_id: '1' },
-        { id: '11', course_code: 'CSE320', course_name: 'Data Communications', category_id: '1' },
-        { id: '12', course_code: 'CSE321', course_name: 'Operating System', category_id: '1' },
-        { id: '13', course_code: 'CSE330', course_name: 'Numerical Methods', category_id: '1' },
-        { id: '14', course_code: 'CSE331', course_name: 'Automata and Computability', category_id: '1' },
-        { id: '15', course_code: 'CSE340', course_name: 'Computer Architecture', category_id: '1' },
-        { id: '16', course_code: 'CSE341', course_name: 'Microprocessors', category_id: '1' },
-        { id: '17', course_code: 'CSE342', course_name: 'Computer Systems Engineering', category_id: '1' },
-        { id: '18', course_code: 'CSE350', course_name: 'Digital Electronics and Pulse Techniques', category_id: '1' },
-        { id: '19', course_code: 'CSE360', course_name: 'Computer Interfacing', category_id: '1' },
-        { id: '20', course_code: 'CSE370', course_name: 'Database Systems', category_id: '1' },
-        { id: '21', course_code: 'CSE371', course_name: 'Management Information Systems', category_id: '1' },
-        { id: '22', course_code: 'CSE390', course_name: 'Technical Communication', category_id: '1' },
-        { id: '23', course_code: 'CSE391', course_name: 'Programming for the Internet', category_id: '1' },
-        { id: '24', course_code: 'CSE392', course_name: 'Signals and Systems', category_id: '1' },
-        { id: '25', course_code: 'CSE410', course_name: 'Advance Programming In UNIX', category_id: '1' },
-        { id: '26', course_code: 'CSE419', course_name: 'Programming Languages and Competitive Programming', category_id: '1' },
-        { id: '27', course_code: 'CSE420', course_name: 'Compiler Design', category_id: '1' },
-        { id: '28', course_code: 'CSE421', course_name: 'Computer Networks', category_id: '1' },
-        { id: '29', course_code: 'CSE422', course_name: 'Artificial Intelligence', category_id: '1' },
-        { id: '30', course_code: 'CSE423', course_name: 'Computer Graphics', category_id: '1' },
-        { id: '31', course_code: 'CSE424', course_name: 'Pattern Recognition', category_id: '1' },
-        { id: '32', course_code: 'CSE425', course_name: 'Neural Networks', category_id: '1' },
-        { id: '33', course_code: 'CSE426', course_name: 'Advanced Algorithms', category_id: '1' },
-        { id: '34', course_code: 'CSE427', course_name: 'Machine Learning', category_id: '1' },
-        { id: '35', course_code: 'CSE428', course_name: 'Image Processing', category_id: '1' },
-        { id: '36', course_code: 'CSE429', course_name: 'Basic Multimedia Theory', category_id: '1' },
-        { id: '37', course_code: 'CSE430', course_name: 'Digital Signal Processing', category_id: '1' },
-        { id: '38', course_code: 'CSE431', course_name: 'Natural Language Processing', category_id: '1' },
-        { id: '39', course_code: 'CSE432', course_name: 'Speech Recognition and Synthesis', category_id: '1' },
-        { id: '40', course_code: 'CSE460', course_name: 'VLSI Design', category_id: '1' },
-        { id: '41', course_code: 'CSE461', course_name: 'Introduction to Robotics', category_id: '1' },
-        { id: '42', course_code: 'CSE462', course_name: 'Fault-Tolerant Systems', category_id: '1' },
-        { id: '43', course_code: 'CSE470', course_name: 'Software Engineering', category_id: '1' },
-        { id: '44', course_code: 'CSE471', course_name: 'Systems Analysis and Design', category_id: '1' },
-        { id: '45', course_code: 'CSE472', course_name: 'Human-Computer Interface', category_id: '1' },
-        { id: '46', course_code: 'CSE473', course_name: 'Financial Engineering & Technology', category_id: '1' },
-        { id: '47', course_code: 'CSE474', course_name: 'Simulation and Modeling', category_id: '1' },
-        { id: '48', course_code: 'CSE490', course_name: 'Special Topics', category_id: '1' },
-        { id: '49', course_code: 'CSE491', course_name: 'Independent Study', category_id: '1' }
-      ];
+      // Load courses from database
+      let coursesToUse = [];
+      try {
+        const { data: dbCourses, error } = await supabase
+          .from('courses')
+          .select('id, course_code, course_name')
+          .eq('is_active', true)
+          .order('course_code');
 
-      setCourses(sampleCourses);
+        if (error) {
+          console.warn('Failed to load courses from database, using fallback:', error);
+          // Fallback to sample courses if database fails
+          coursesToUse = [
+            { id: '1', course_code: 'CSE101', course_name: 'Introduction to Computer Science', category_id: '1' },
+            { id: '2', course_code: 'CSE110', course_name: 'Programming Language I', category_id: '1' },
+            { id: '3', course_code: 'CSE111', course_name: 'Programming Language II', category_id: '1' },
+            { id: '4', course_code: 'CSE220', course_name: 'Data Structures', category_id: '1' },
+            { id: '5', course_code: 'CSE221', course_name: 'Algorithms', category_id: '1' },
+            { id: '6', course_code: 'CSE230', course_name: 'Discrete Mathematics', category_id: '1' },
+            { id: '7', course_code: 'CSE250', course_name: 'Circuits and Electronics', category_id: '1' },
+            { id: '8', course_code: 'CSE251', course_name: 'Electronic Devices and Circuits', category_id: '1' },
+            { id: '9', course_code: 'CSE260', course_name: 'Digital Logic Design', category_id: '1' },
+            { id: '10', course_code: 'CSE310', course_name: 'Object-Oriented Programming', category_id: '1' },
+            { id: '11', course_code: 'CSE320', course_name: 'Data Communications', category_id: '1' },
+            { id: '12', course_code: 'CSE321', course_name: 'Operating System', category_id: '1' },
+            { id: '13', course_code: 'CSE330', course_name: 'Numerical Methods', category_id: '1' },
+            { id: '14', course_code: 'CSE331', course_name: 'Automata and Computability', category_id: '1' },
+            { id: '15', course_code: 'CSE340', course_name: 'Computer Architecture', category_id: '1' },
+            { id: '16', course_code: 'CSE341', course_name: 'Microprocessors', category_id: '1' },
+            { id: '17', course_code: 'CSE342', course_name: 'Computer Systems Engineering', category_id: '1' },
+            { id: '18', course_code: 'CSE350', course_name: 'Digital Electronics and Pulse Techniques', category_id: '1' },
+            { id: '19', course_code: 'CSE360', course_name: 'Computer Interfacing', category_id: '1' },
+            { id: '20', course_code: 'CSE370', course_name: 'Database Systems', category_id: '1' },
+            { id: '21', course_code: 'CSE371', course_name: 'Management Information Systems', category_id: '1' },
+            { id: '22', course_code: 'CSE390', course_name: 'Technical Communication', category_id: '1' },
+            { id: '23', course_code: 'CSE391', course_name: 'Programming for the Internet', category_id: '1' },
+            { id: '24', course_code: 'CSE392', course_name: 'Signals and Systems', category_id: '1' },
+            { id: '25', course_code: 'CSE410', course_name: 'Advance Programming In UNIX', category_id: '1' },
+            { id: '26', course_code: 'CSE419', course_name: 'Programming Languages and Competitive Programming', category_id: '1' },
+            { id: '27', course_code: 'CSE420', course_name: 'Compiler Design', category_id: '1' },
+            { id: '28', course_code: 'CSE421', course_name: 'Computer Networks', category_id: '1' },
+            { id: '29', course_code: 'CSE422', course_name: 'Artificial Intelligence', category_id: '1' },
+            { id: '30', course_code: 'CSE423', course_name: 'Computer Graphics', category_id: '1' },
+            { id: '31', course_code: 'CSE424', course_name: 'Pattern Recognition', category_id: '1' },
+            { id: '32', course_code: 'CSE425', course_name: 'Neural Networks', category_id: '1' },
+            { id: '33', course_code: 'CSE426', course_name: 'Advanced Algorithms', category_id: '1' },
+            { id: '34', course_code: 'CSE427', course_name: 'Machine Learning', category_id: '1' },
+            { id: '35', course_code: 'CSE428', course_name: 'Image Processing', category_id: '1' },
+            { id: '36', course_code: 'CSE429', course_name: 'Basic Multimedia Theory', category_id: '1' },
+            { id: '37', course_code: 'CSE430', course_name: 'Digital Signal Processing', category_id: '1' },
+            { id: '38', course_code: 'CSE431', course_name: 'Natural Language Processing', category_id: '1' },
+            { id: '39', course_code: 'CSE432', course_name: 'Speech Recognition and Synthesis', category_id: '1' },
+            { id: '40', course_code: 'CSE460', course_name: 'VLSI Design', category_id: '1' },
+            { id: '41', course_code: 'CSE461', course_name: 'Introduction to Robotics', category_id: '1' },
+            { id: '42', course_code: 'CSE462', course_name: 'Fault-Tolerant Systems', category_id: '1' },
+            { id: '43', course_code: 'CSE470', course_name: 'Software Engineering', category_id: '1' },
+            { id: '44', course_code: 'CSE471', course_name: 'Systems Analysis and Design', category_id: '1' },
+            { id: '45', course_code: 'CSE472', course_name: 'Human-Computer Interface', category_id: '1' },
+            { id: '46', course_code: 'CSE473', course_name: 'Financial Engineering & Technology', category_id: '1' },
+            { id: '47', course_code: 'CSE474', course_name: 'Simulation and Modeling', category_id: '1' },
+            { id: '48', course_code: 'CSE490', course_name: 'Special Topics', category_id: '1' },
+            { id: '49', course_code: 'CSE491', course_name: 'Independent Study', category_id: '1' }
+          ];
+        } else {
+          // Use database courses with proper mapping
+          coursesToUse = dbCourses.map(course => ({
+            ...course,
+            category_id: '1' // Add category_id for compatibility with existing interface
+          }));
+          console.log('✅ Loaded', coursesToUse.length, 'courses from database');
+        }
+      } catch (dbError) {
+        console.error('Database error loading courses:', dbError);
+        // Fallback courses if database completely fails
+        coursesToUse = [
+          { id: '1', course_code: 'CSE110', course_name: 'Programming Language I', category_id: '1' },
+          { id: '2', course_code: 'CSE220', course_name: 'Data Structures', category_id: '1' },
+          { id: '3', course_code: 'CSE370', course_name: 'Database Systems', category_id: '1' },
+          { id: '4', course_code: 'CSE470', course_name: 'Software Engineering', category_id: '1' }
+        ];
+      }
+
+      setCourses(coursesToUse);
       // Load existing papers from localStorage
       const savedPapers = localStorage.getItem('questionPapers');
       if (savedPapers) {
@@ -341,6 +379,54 @@ const Questions = () => {
         console.error('Delete error:', error);
         toast.error('Failed to delete file');
       }
+    }
+  };
+
+  const handleReportPaper = (paper: QuestionPaper) => {
+    setPaperToReport(paper);
+    setReportReason('');
+    setReportDescription('');
+    setReportModalOpen(true);
+  };
+
+  const submitPaperReport = async () => {
+    if (!paperToReport || !user || !reportReason) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      console.log('Submitting question paper report:', {
+        paperId: paperToReport.id,
+        reason: reportReason,
+        description: reportDescription
+      });
+
+      // Use our reporting system to capture the actual paper content
+      const reportResult = await supabase.rpc('report_content', {
+        content_type_input: 'question_paper',
+        content_id_input: paperToReport.id,
+        reason_input: reportReason,
+        description_input: reportDescription,
+        reporter_email_input: user.email,
+        reporter_name_input: user.name || user.email
+      });
+
+      if (reportResult.error) {
+        throw reportResult.error;
+      }
+
+      setReportModalOpen(false);
+      setPaperToReport(null);
+      setReportReason('');
+      setReportDescription('');
+      
+      toast.success('Question paper reported successfully', {
+        description: 'Moderators will review this content shortly.'
+      });
+    } catch (err) {
+      console.error('Report error:', err);
+      toast.error('Failed to report question paper. Please try again.');
     }
   };
 
@@ -583,15 +669,28 @@ const Questions = () => {
                                   variant="ghost"
                                   className="p-1 sm:p-2"
                                   onClick={() => handleDownload(paper)}
+                                  title="Download paper"
                                 >
                                   <Download className="h-3 w-3 sm:h-4 sm:w-4" />
                                 </Button>
+                                {user && paper.uploaded_by_email !== user.email && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 p-1 sm:p-2"
+                                    onClick={() => handleReportPaper(paper)}
+                                    title="Report inappropriate content"
+                                  >
+                                    <Flag className="h-3 w-3 sm:h-4 sm:w-4" />
+                                  </Button>
+                                )}
                                 {user && paper.uploaded_by_email === user.email && (
                                   <Button
                                     size="sm"
                                     variant="ghost"
                                     className="text-red-600 hover:text-red-700 hover:bg-red-50 p-1 sm:p-2"
                                     onClick={() => handleDelete(paper)}
+                                    title="Delete your paper"
                                   >
                                     <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
                                   </Button>
@@ -647,6 +746,91 @@ const Questions = () => {
       </main>
 
       <Footer />
+
+      {/* Report Question Paper Dialog */}
+      <Dialog open={reportModalOpen} onOpenChange={setReportModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Flag className="h-5 w-5 text-red-500" />
+              Report Question Paper
+            </DialogTitle>
+            <DialogDescription>
+              Help us maintain quality by reporting inappropriate or problematic content.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Content Preview */}
+            {paperToReport && (
+              <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border-l-4 border-red-500">
+                <div className="text-sm font-medium mb-1">Paper being reported:</div>
+                <div className="text-sm font-semibold">{paperToReport.title}</div>
+                <div className="text-xs text-slate-500 mt-1 space-x-2">
+                  <span>Course: {paperToReport.course_code}</span>
+                  <span>•</span>
+                  <span>Year: {paperToReport.year}</span>
+                  <span>•</span>
+                  <span>Semester: {paperToReport.semester}</span>
+                  <span>•</span>
+                  <span>Type: {paperToReport.exam_type}</span>
+                </div>
+                <div className="text-xs text-slate-500 mt-1">
+                  Uploaded by {paperToReport.uploaded_by_name} • {new Date(paperToReport.uploaded_at).toLocaleDateString()}
+                </div>
+              </div>
+            )}
+
+            {/* Report Reason */}
+            <div className="space-y-2">
+              <Label htmlFor="report-reason">Reason for reporting *</Label>
+              <Select value={reportReason} onValueChange={setReportReason}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a reason..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="copyright">Copyright violation</SelectItem>
+                  <SelectItem value="inappropriate">Inappropriate content</SelectItem>
+                  <SelectItem value="wrong_course">Wrong course material</SelectItem>
+                  <SelectItem value="poor_quality">Poor quality/unreadable</SelectItem>
+                  <SelectItem value="spam">Spam or irrelevant content</SelectItem>
+                  <SelectItem value="duplicate">Duplicate submission</SelectItem>
+                  <SelectItem value="malicious">Malicious file</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Additional Details */}
+            <div className="space-y-2">
+              <Label htmlFor="report-description">Additional details (optional)</Label>
+              <Textarea
+                id="report-description"
+                placeholder="Please provide any additional context that would help our moderators..."
+                value={reportDescription}
+                onChange={(e) => setReportDescription(e.target.value)}
+                className="min-h-[80px]"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setReportModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={submitPaperReport}
+              disabled={!reportReason}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Submit Report
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

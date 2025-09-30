@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 export const Footer = () => {
   const currentYear = new Date().getFullYear();
 
@@ -21,6 +23,20 @@ export const Footer = () => {
             >
               Privacy
             </button>
+            <Link
+              to="/contact"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              title="Contact Administration"
+            >
+              Contact
+            </Link>
+            <Link
+              to="/admin"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              title="Admin Dashboard"
+            >
+              Admin
+            </Link>
           </div>
         </div>
       </div>

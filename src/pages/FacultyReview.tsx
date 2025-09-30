@@ -12,10 +12,11 @@ import {
 import { Button } from "@/components/ui/button";
 
 interface Faculty {
-  initial: string;
+  faculty_initial: string;
   full_name: string;
   email: string;
-  desk: string;
+  department: string;
+  courses_taught?: string[];
   avg_rating?: number;
 }
 
@@ -51,7 +52,7 @@ const FacultyReview: React.FC = () => {
         // Fetch faculties
         const { data: facultyData, error: facultyError } = await supabase
           .from('faculties')
-          .select('initial, full_name, email, desk');
+          .select('faculty_initial, full_name, email, department, courses_taught');
         
         if (facultyError) {
           setError('Failed to fetch faculty list.');
@@ -88,7 +89,7 @@ const FacultyReview: React.FC = () => {
         // Combine faculty data with ratings
         const facultiesWithRatings = (facultyData || []).map(faculty => ({
           ...faculty,
-          avg_rating: ratingMap[faculty.initial] || undefined,
+          avg_rating: ratingMap[faculty.faculty_initial] || undefined,
         }));
 
         setFaculties(facultiesWithRatings);
@@ -99,11 +100,81 @@ const FacultyReview: React.FC = () => {
           .select('course_code, course_name');
         setCourses(courseData || []);
 
-        // Fetch faculty-course relationships for course filtering
-        const { data: fcData } = await supabase
+        // Build faculty-course relationships from ALL sources: 
+        // 1. Original faculty_courses table, 2. Admin courses_taught field, 3. Review history
+        const facultyCoursesList: {faculty_initial: string, course_code: string}[] = [];
+        
+        // MAIN SOURCE: Load from original faculty_courses table
+        const { data: originalFC, error: fcError } = await supabase
           .from('faculty_courses')
           .select('faculty_initial, course_code');
-        setFacultyCourses(fcData || []);
+          
+        if (originalFC && !fcError) {
+          originalFC.forEach(fc => {
+            facultyCoursesList.push({
+              faculty_initial: fc.faculty_initial,
+              course_code: fc.course_code
+            });
+          });
+  
+        } else {
+          console.error('Error loading faculty_courses:', fcError);
+        }
+        
+        if (facultyData) {
+          // ADDITIONAL: Add admin-assigned courses from courses_taught field (for new admin feature)
+          facultyData.forEach(faculty => {
+            if (faculty.courses_taught && Array.isArray(faculty.courses_taught)) {
+              faculty.courses_taught.forEach(courseCode => {
+                // Only add if not already in the list from faculty_courses table
+                const exists = facultyCoursesList.some(fc => 
+                  fc.faculty_initial === faculty.faculty_initial && 
+                  fc.course_code === courseCode
+                );
+                if (!exists) {
+                  facultyCoursesList.push({
+                    faculty_initial: faculty.faculty_initial,
+                    course_code: courseCode
+                  });
+
+                }
+              });
+            }
+          });
+          
+          // FALLBACK: For faculties with no assignments, get courses from review history
+          try {
+            const { data: reviewCourses, error: reviewError } = await supabase
+              .from('reviews')
+              .select('faculty_initial, course_code')
+              .not('course_code', 'is', null);
+            
+            if (reviewCourses && !reviewError) {
+              const facultiesWithNoAssignments = facultyData
+                .filter(f => !facultyCoursesList.some(fc => fc.faculty_initial === f.faculty_initial))
+                .map(f => f.faculty_initial);
+                
+              reviewCourses.forEach(rc => {
+                if (facultiesWithNoAssignments.includes(rc.faculty_initial)) {
+                  const exists = facultyCoursesList.some(fc => 
+                    fc.faculty_initial === rc.faculty_initial && 
+                    fc.course_code === rc.course_code
+                  );
+                  if (!exists) {
+                    facultyCoursesList.push({
+                      faculty_initial: rc.faculty_initial,
+                      course_code: rc.course_code
+                    });
+                  }
+                }
+              });
+            }
+          } catch (reviewErr) {
+            console.error('Error loading review courses:', reviewErr);
+          }
+        }
+
+        setFacultyCourses(facultyCoursesList);
       } catch (err) {
         setError('Failed to fetch faculty list.');
       }
@@ -119,7 +190,7 @@ const FacultyReview: React.FC = () => {
     
     if (filterType === 'faculty') {
       return (
-        faculty.initial.toLowerCase().includes(searchLower) ||
+        faculty.faculty_initial.toLowerCase().includes(searchLower) ||
         faculty.full_name.toLowerCase().includes(searchLower)
       );
     } else {
@@ -130,7 +201,7 @@ const FacultyReview: React.FC = () => {
         .filter(fc => fc.course_code.toLowerCase().includes(searchLower))
         .map(fc => fc.faculty_initial);
       
-      return facultyInitials.includes(faculty.initial);
+      return facultyInitials.includes(faculty.faculty_initial);
     }
   });
 
@@ -183,14 +254,14 @@ const FacultyReview: React.FC = () => {
         ) : (
           filteredFaculties.map(faculty => (
             <div
-              key={faculty.initial}
+              key={faculty.faculty_initial}
               className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 cursor-pointer hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-600 transition-all duration-200 group"
-              onClick={() => navigate(`/faculty/${faculty.initial}`)}
+              onClick={() => navigate(`/faculty/${faculty.faculty_initial}`)}
             >
               {/* Faculty Avatar */}
               <div className="flex items-start gap-4 mb-4">
                 <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
-                  {faculty.initial}
+                  {faculty.faculty_initial}
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-slate-900 dark:text-white text-lg group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
@@ -204,8 +275,40 @@ const FacultyReview: React.FC = () => {
               <div className="space-y-2 mb-4">
                 <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 text-sm">
                   <span>🏢</span>
-                  <span>Desk {faculty.desk}</span>
+                  <span>Department: {faculty.department}</span>
                 </div>
+                
+                {/* Courses Taught Badges */}
+                {(() => {
+                  // Get courses for this faculty from admin assignments OR review history
+                  const facultyCourseCodes = facultyCourses
+                    .filter(fc => fc.faculty_initial === faculty.faculty_initial)
+                    .map(fc => fc.course_code);
+                  
+                  // Get course names from courses array
+                  const facultyCourseData = facultyCourseCodes
+                    .map(courseCode => courses.find(c => c.course_code === courseCode))
+                    .filter(Boolean)
+                    .slice(0, 3); // Limit to 3 courses for space
+                    
+                  return facultyCourseData.length > 0 ? (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {facultyCourseData.map((course, index) => (
+                        <span 
+                          key={course!.course_code}
+                          className="inline-flex items-center px-2 py-1 text-xs font-medium bg-gradient-to-r from-blue-100 to-purple-100 dark:from-blue-900 dark:to-purple-900 text-blue-800 dark:text-blue-200 rounded-full border border-blue-200 dark:border-blue-700"
+                        >
+                          {course!.course_code}
+                        </span>
+                      ))}
+                      {facultyCourseCodes.length > 3 && (
+                        <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-slate-600 dark:text-slate-400">
+                          +{facultyCourseCodes.length - 3} more
+                        </span>
+                      )}
+                    </div>
+                  ) : null;
+                })()}
               </div>
               
               {/* Rating */}

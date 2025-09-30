@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { Header } from '../components/Header';
 import { ArrowLeft, Star, MessageCircle, ThumbsUp, ThumbsDown, Flag, Send, X, Edit, Trash2, Mail, MapPin } from 'lucide-react';
+import AdminService from '../lib/adminService';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -16,6 +17,24 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
 
 interface Review {
   faculty_initial: string;
@@ -35,10 +54,11 @@ interface Review {
 }
 
 interface Faculty {
-  initial: string;
+  faculty_initial: string;
   full_name: string;
   email?: string;
-  desk?: string;
+  department?: string;
+  courses_taught?: string[];
 }
 
 interface Course {
@@ -71,6 +91,12 @@ const FacultyDetail: React.FC = () => {
   const [isFetchingReviews, setIsFetchingReviews] = useState(false); // Prevent multiple simultaneous fetches
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [reviewToDelete, setReviewToDelete] = useState<Review | null>(null);
+  
+  // Reporting modal state
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [reviewToReport, setReviewToReport] = useState<Review | null>(null);
+  const [reportReason, setReportReason] = useState('');
+  const [reportDescription, setReportDescription] = useState('');
 
   // FACEBOOK-STYLE: Format reply text to highlight @mentions
   const formatReplyText = (text: string) => {
@@ -289,21 +315,77 @@ const FacultyDetail: React.FC = () => {
       // Fetch faculty info by initial
       const { data: facultyData, error: facultyError } = await supabase
         .from('faculties')
-        .select('initial, full_name, email, desk')
-        .eq('initial', facultyId)
+        .select('faculty_initial, full_name, email, department, courses_taught')
+        .eq('faculty_initial', facultyId)
         .single();
       if (facultyError || !facultyData) {
         setError('Faculty not found.');
         setLoading(false);
         return;
       }
+
       setFaculty(facultyData);
-      // Fetch courses taught by faculty (assuming faculty_courses has faculty_initial and course_code)
-      const { data: courseData } = await supabase
+      
+      // Fetch courses taught by faculty from ALL sources: faculty_courses table, courses_taught field, review history
+      let allCourseCodes: string[] = [];
+      
+      // PRIMARY: Get courses from original faculty_courses table
+      const { data: facultyCourses, error: fcError } = await supabase
         .from('faculty_courses')
-        .select('course_code, courses(course_name)')
-        .eq('faculty_initial', facultyId);
-      setCourses(courseData?.map((fc: any) => ({ course_code: fc.course_code, course_name: fc.courses?.course_name })) || []);
+        .select('course_code')
+        .eq('faculty_initial', facultyData.faculty_initial);
+        
+      if (facultyCourses && !fcError) {
+        allCourseCodes = facultyCourses.map(fc => fc.course_code);
+        console.log('🔍 DEBUG: Found courses from faculty_courses table:', allCourseCodes);
+      }
+      
+      // ADDITIONAL: Get courses from admin assignments (courses_taught field)
+      if (facultyData.courses_taught && Array.isArray(facultyData.courses_taught)) {
+        facultyData.courses_taught.forEach(courseCode => {
+          if (!allCourseCodes.includes(courseCode)) {
+            allCourseCodes.push(courseCode);
+          }
+        });
+
+      }
+      
+      // FALLBACK: For faculty with no assignments, get courses from their review history
+      if (allCourseCodes.length === 0) {
+        const { data: reviewCourses } = await supabase
+          .from('reviews')
+          .select('course_code')
+          .eq('faculty_initial', facultyData.faculty_initial)
+          .not('course_code', 'is', null);
+          
+        if (reviewCourses) {
+          const uniqueReviewCourses = [...new Set(reviewCourses.map(rc => rc.course_code))];
+          allCourseCodes = [...allCourseCodes, ...uniqueReviewCourses];
+
+        }
+      }
+      
+      // Get course names for all course codes
+      if (allCourseCodes.length > 0) {
+        const { data: courseData, error: courseError } = await supabase
+          .from('courses')
+          .select('course_code, course_name')
+          .in('course_code', allCourseCodes);
+        
+        if (courseData && courseData.length > 0) {
+          const mappedCourses = courseData.map(course => ({
+            course_code: course.course_code, 
+            course_name: course.course_name 
+          }));
+          
+          setCourses(mappedCourses);
+        } else {
+          setCourses([]);
+        }
+      } else {
+
+        setCourses([]);
+      }
       setLoading(false);
     };
     
@@ -852,20 +934,50 @@ const FacultyDetail: React.FC = () => {
 
   // Report (placeholder)
   const handleReport = async (review: Review) => {
+    setReviewToReport(review);
+    setReportReason('');
+    setReportDescription('');
+    setReportModalOpen(true);
+  };
+
+  const submitReport = async () => {
+    if (!reviewToReport || !user || !reportReason) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
     try {
-      // You could implement a reports table here in the future
-      // For now, just show a confirmation
-      const confirmed = confirm('Are you sure you want to report this review?');
-      if (confirmed) {
-        // Here you could insert into a reports table
-        // await supabase.from('reports').insert([{...}]);
-        toast.success('Review reported successfully', {
-          description: 'Moderators will review it.'
-        });
+      console.log('Submitting faculty review report:', {
+        reviewId: `${reviewToReport.faculty_initial}_${reviewToReport.created_at}`,
+        reason: reportReason,
+        description: reportDescription
+      });
+
+      // Use our reporting system to capture the actual review content
+      const reportResult = await supabase.rpc('report_content', {
+        content_type_input: 'faculty_review',
+        content_id_input: `${reviewToReport.faculty_initial}_${reviewToReport.created_at}`, // Use faculty_initial + timestamp as ID
+        reason_input: reportReason,
+        description_input: reportDescription,
+        reporter_email_input: user.email,
+        reporter_name_input: user.name || user.email
+      });
+
+      if (reportResult.error) {
+        throw reportResult.error;
       }
+
+      setReportModalOpen(false);
+      setReviewToReport(null);
+      setReportReason('');
+      setReportDescription('');
+      
+      toast.success('Review reported successfully', {
+        description: 'Moderators will review this content shortly.'
+      });
     } catch (err) {
       console.error('Report error:', err);
-      toast.error('Failed to report review.');
+      toast.error('Failed to report review. Please try again.');
     }
   };
 
@@ -1087,7 +1199,7 @@ const FacultyDetail: React.FC = () => {
           <div className="bg-white dark:bg-slate-800 rounded-2xl sm:rounded-3xl shadow-lg hover:shadow-xl border border-slate-200 dark:border-slate-700 p-6 sm:p-8 lg:p-10 transition-all duration-300 hover:scale-[1.02] animate-in slide-in-from-top-4 fade-in duration-500">
             <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
               <div className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 bg-gradient-to-br from-blue-500 via-purple-500 to-indigo-600 rounded-xl sm:rounded-2xl flex items-center justify-center text-white text-xl sm:text-2xl lg:text-3xl font-bold shadow-lg animate-in zoom-in duration-300 hover:rotate-3 transition-transform">
-                {faculty?.initial}
+                {faculty?.faculty_initial}
               </div>
               <div className="flex-1 w-full sm:w-auto">
                 <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 dark:text-white mb-2 sm:mb-4 animate-in slide-in-from-left-6 fade-in duration-700 delay-200">
@@ -1102,10 +1214,10 @@ const FacultyDetail: React.FC = () => {
                       {faculty.email}
                     </span>
                   )}
-                  {faculty?.desk && (
+                  {faculty?.department && (
                     <span className="flex items-center gap-2 text-sm sm:text-base bg-slate-50 dark:bg-slate-700 px-3 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors">
                       <MapPin className="h-4 w-4 text-green-500" />
-                      Desk {faculty.desk}
+                      Department: {faculty.department}
                     </span>
                   )}
                 </div>
@@ -1188,7 +1300,7 @@ const FacultyDetail: React.FC = () => {
               </div>
 
               {/* Course Selection */}
-              {courses.length > 1 && (
+              {courses.length > 0 && (
                 <div className="transform transition-all duration-200 hover:scale-[1.02]">
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 sm:mb-3">
                     Course (Optional)
@@ -1201,7 +1313,7 @@ const FacultyDetail: React.FC = () => {
                     <option value="">General Review</option>
                     {courses.map(course => (
                       <option key={course.course_code} value={course.course_code}>
-                        {course.course_code}
+                        {course.course_code} - {course.course_name}
                       </option>
                     ))}
                   </select>
@@ -1833,6 +1945,84 @@ const FacultyDetail: React.FC = () => {
   )}
       </div>
       
+      {/* Report Review Dialog */}
+      <Dialog open={reportModalOpen} onOpenChange={setReportModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Flag className="h-5 w-5 text-red-500" />
+              Report {reviewToReport?.parent_faculty_initial ? 'Reply' : 'Review'}
+            </DialogTitle>
+            <DialogDescription>
+              Help us keep the community safe by reporting inappropriate content.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Content Preview */}
+            {reviewToReport && (
+              <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border-l-4 border-red-500">
+                <div className="text-sm font-medium mb-1">Content being reported:</div>
+                <div className="text-sm text-slate-600 dark:text-slate-400 line-clamp-3">
+                  "{reviewToReport.comment}"
+                </div>
+                <div className="text-xs text-slate-500 mt-1">
+                  By {reviewToReport.user_name} • {new Date(reviewToReport.created_at).toLocaleDateString()}
+                </div>
+              </div>
+            )}
+
+            {/* Report Reason */}
+            <div className="space-y-2">
+              <Label htmlFor="report-reason">Reason for reporting *</Label>
+              <Select value={reportReason} onValueChange={setReportReason}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a reason..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="harassment">Harassment or bullying</SelectItem>
+                  <SelectItem value="hate_speech">Hate speech</SelectItem>
+                  <SelectItem value="inappropriate">Inappropriate content</SelectItem>
+                  <SelectItem value="spam">Spam or promotional content</SelectItem>
+                  <SelectItem value="misinformation">False or misleading information</SelectItem>
+                  <SelectItem value="personal_attack">Personal attack on faculty</SelectItem>
+                  <SelectItem value="profanity">Profanity or offensive language</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Additional Details */}
+            <div className="space-y-2">
+              <Label htmlFor="report-description">Additional details (optional)</Label>
+              <Textarea
+                id="report-description"
+                placeholder="Please provide any additional context that would help our moderators..."
+                value={reportDescription}
+                onChange={(e) => setReportDescription(e.target.value)}
+                className="min-h-[80px]"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setReportModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={submitReport}
+              disabled={!reportReason}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Submit Report
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogContent>
