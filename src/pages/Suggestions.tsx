@@ -11,6 +11,7 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { supabase } from "@/lib/supabaseClient";
+import AdminService from "@/lib/adminService";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -81,8 +82,6 @@ const fetchPosts = async (): Promise<SuggestionPost[]> => {
 };
 
 const createPostInDB = async (post: Omit<SuggestionPost, 'id' | 'created_at' | 'updated_at'>): Promise<SuggestionPost> => {
-  console.log('Creating post with data:', post);
-  
   // Since we're using Google auth (not Supabase auth) and RLS is disabled, 
   // we can directly insert without auth checks
   const { data, error } = await supabase
@@ -100,7 +99,6 @@ const createPostInDB = async (post: Omit<SuggestionPost, 'id' | 'created_at' | '
     throw error;
   }
   
-  console.log('Post created successfully:', data);
   return data;
 };
 
@@ -218,8 +216,6 @@ const fetchComments = async (postId: string): Promise<Comment[]> => {
 };
 
 const createCommentInDB = async (comment: Omit<Comment, 'id' | 'created_at' | 'updated_at'>): Promise<Comment> => {
-  console.log('Creating comment with data:', comment);
-  
   const { data, error } = await supabase
     .from('suggestion_comments')
     .insert([comment])
@@ -232,7 +228,6 @@ const createCommentInDB = async (comment: Omit<Comment, 'id' | 'created_at' | 'u
     throw error;
   }
   
-  console.log('Comment created successfully:', data);
   return data;
 };
 
@@ -421,7 +416,6 @@ const Suggestions = () => {
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'suggestion_posts' },
         (payload) => {
-          console.log('Posts change detected:', payload);
           // Refresh posts when any change occurs
           loadPosts();
         }
@@ -433,7 +427,6 @@ const Suggestions = () => {
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'suggestion_comments' },
         (payload) => {
-          console.log('Comments change detected:', payload);
           // Refresh posts and comments when comment changes occur
           loadPosts();
         }
@@ -445,7 +438,6 @@ const Suggestions = () => {
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'suggestion_likes' },
         (payload) => {
-          console.log('Likes change detected:', payload);
           // Refresh posts and user likes when like changes occur
           loadPosts();
         }
@@ -537,12 +529,7 @@ const Suggestions = () => {
   };
 
   const createPost = async () => {
-    console.log('CreatePost called - User:', user);
-    console.log('Student info:', studentInfo);
-    console.log('New post content:', newPost);
-    
     if (!user || !studentInfo || !newPost.trim()) {
-      console.log('Missing required data:', { user: !!user, studentInfo: !!studentInfo, newPost: !!newPost.trim() });
       alert(`Missing data: User: ${!!user}, StudentInfo: ${!!studentInfo}, Post: ${!!newPost.trim()}`);
       return;
     }
@@ -558,18 +545,12 @@ const Suggestions = () => {
         comments_count: 0
       };
       
-      console.log('Creating post with data:', postData);
-      
-      console.log('Attempting to create post with data:', postData);
-      
       // Test Supabase connection first
-      console.log('Testing Supabase connection...');
       const { data: testData, error: testError } = await supabase.from('suggestion_posts').select('count').limit(1);
       if (testError) {
         console.error('Supabase connection test failed:', testError);
         throw new Error(`Database connection failed: ${testError.message}`);
       }
-      console.log('Supabase connection test passed');
       
       const newPostFromDB = await createPostInDB(postData);
       const updatedPosts = [newPostFromDB, ...posts];
@@ -579,15 +560,9 @@ const Suggestions = () => {
       toast.success('Post created successfully!');
     } catch (error: any) {
       console.error('Create post error:', error);
-      console.error('Error type:', typeof error);
-      console.error('Error stringified:', JSON.stringify(error, null, 2));
       
-      // Show detailed error in toast for debugging
       const errorMessage = error?.message || error?.error_description || error?.toString() || 'Unknown error';
       toast.error(`Failed to create post: ${errorMessage}`);
-      
-      // Also alert the error for immediate visibility
-      alert(`Debug - Create post failed: ${errorMessage}`);
     } finally {
       setIsPosting(false);
     }
@@ -838,26 +813,68 @@ const Suggestions = () => {
     }
 
     try {
-      console.log('Submitting report:', {
-        contentId: contentToReport.id,
-        type: contentToReport.type,
-        reason: reportReason,
-        description: reportDescription
-      });
+      // Find the actual content to capture in the snapshot
+      let actualContent = '';
+      let author_name = '';
+      let author_email = '';
+      let additional_data = {};
 
-      // Use our reporting system to capture the actual content
-      const reportResult = await supabase.rpc('report_content', {
-        content_type_input: contentToReport.type === 'post' ? 'suggestion_post' : 'suggestion_comment',
-        content_id_input: contentToReport.id,
-        reason_input: reportReason,
-        description_input: reportDescription,
-        reporter_email_input: user.email,
-        reporter_name_input: user.name || user.email
-      });
-
-      if (reportResult.error) {
-        throw reportResult.error;
+      if (contentToReport.type === 'post') {
+        const post = posts.find(p => p.id === contentToReport.id);
+        if (post) {
+          actualContent = post.content || '';
+          author_name = post.author_name || '';
+          author_email = post.author_email || '';
+          additional_data = {
+            author_student_id: post.author_student_id || '',
+            likes_count: post.likes_count || 0,
+            comments_count: post.comments_count || 0
+          };
+        }
+      } else {
+        // Find comment in any post's comments
+        let foundComment = null;
+        for (const post of posts) {
+          const comments = await fetchComments(post.id);
+          const comment = comments.find(c => c.id === contentToReport.id) ||
+                         comments.flatMap(c => c.replies || []).find(r => r.id === contentToReport.id);
+          if (comment) {
+            foundComment = comment;
+            break;
+          }
+        }
+        
+        if (foundComment) {
+          actualContent = foundComment.content || '';
+          author_name = foundComment.author_name || '';
+          author_email = foundComment.author_email || '';
+          additional_data = {
+            author_student_id: foundComment.author_student_id || '',
+            parent_comment_id: foundComment.parent_comment_id || null
+          };
+        }
       }
+
+      // Create comprehensive content snapshot
+      const contentSnapshot = {
+        actual_content: actualContent,
+        content_type: contentToReport.type === 'post' ? 'suggestion_post' : 'suggestion_comment',
+        author_name,
+        author_email,
+        captured_at: new Date().toISOString(),
+        ...additional_data
+      };
+
+      // Use AdminService.createReport for consistent reporting
+      await AdminService.createReport({
+        content_type: contentToReport.type === 'post' ? 'suggestion_post' : 'suggestion_comment',
+        content_id: contentToReport.id,
+        reason: reportReason,
+        description: reportDescription,
+        reporter_email: user.email || '',
+        reporter_name: user.name || user.email || 'Anonymous',
+        content_snapshot: contentSnapshot
+      });
 
       setReportModalOpen(false);
       setContentToReport(null);
@@ -1115,14 +1132,17 @@ const Suggestions = () => {
                               <span className="text-xs sm:text-sm">{post.comments_count}</span>
                             </Button>
                           </div>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="p-1 sm:p-2"
-                            onClick={() => reportPost(post.id)}
-                          >
-                            <Flag className="h-3 w-3 sm:h-4 sm:w-4" />
-                          </Button>
+                          {post.author_email !== user?.email && (
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="p-1 sm:p-2"
+                              onClick={() => reportPost(post.id)}
+                              title="Report inappropriate content"
+                            >
+                              <Flag className="h-3 w-3 sm:h-4 sm:w-4" />
+                            </Button>
+                          )}
                         </div>
                       </>
                     )}
@@ -1237,13 +1257,14 @@ const Suggestions = () => {
                                       </>
                                     )}
                                     
-                                    {/* Report for other users */}
+                                    {/* Report functionality */}
                                     {user && comment.author_email !== user.email && (
                                       <Button
                                         size="sm"
                                         variant="ghost"
                                         className="text-xs p-1 text-orange-500 hover:text-orange-700"
                                         onClick={() => reportComment(comment.id, comment.author_name)}
+                                        title="Report inappropriate content"
                                       >
                                         <Flag className="h-3 w-3" />
                                       </Button>
@@ -1358,13 +1379,14 @@ const Suggestions = () => {
                                             </>
                                           )}
                                           
-                                          {/* Report for other users */}
+                                          {/* Report functionality */}
                                           {user && reply.author_email !== user.email && (
                                             <Button
                                               size="sm"
                                               variant="ghost"
                                               className="text-xs p-1 text-orange-500 hover:text-orange-700"
                                               onClick={() => reportComment(reply.id, reply.author_name)}
+                                              title="Report inappropriate content"
                                             >
                                               <Flag className="h-3 w-3" />
                                             </Button>

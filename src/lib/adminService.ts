@@ -171,10 +171,65 @@ class AdminService {
   }
 
   // REPORTED CONTENT MANAGEMENT
+  static async createReport(reportData: {
+    content_type: string;
+    content_id: string;
+    reason: string;
+    description?: string;
+    reporter_email: string;
+    reporter_name?: string;
+    content_snapshot?: any;
+  }): Promise<void> {
+    try {
+      console.log('AdminService.createReport - Attempting insert with data:', reportData);
+      
+      const insertData = {
+        content_type: reportData.content_type,
+        content_id: reportData.content_id,
+        content_table: reportData.content_type === 'question_paper' ? 'question-papers' :
+                      reportData.content_type === 'suggestion_post' ? 'suggestion_posts' :
+                      reportData.content_type === 'suggestion_comment' ? 'suggestion_comments' :
+                      reportData.content_type === 'faculty_review' ? 'reviews' : 'unknown',
+        reason: reportData.reason,
+        description: reportData.description || null,
+        reporter_email: reportData.reporter_email,
+        reporter_name: reportData.reporter_name || 'Anonymous',
+        content_snapshot: reportData.content_snapshot || {},
+        status: 'pending',
+        priority: reportData.reason === 'copyright' || reportData.reason === 'malicious' ? 'critical' :
+                 reportData.reason === 'inappropriate' || reportData.reason === 'spam' ? 'high' : 'medium'
+      };
+
+      console.log('AdminService.createReport - Insert data prepared:', insertData);
+
+      const { data, error } = await supabase
+        .from('reported_content')
+        .insert(insertData)
+        .select();
+
+      console.log('AdminService.createReport - Supabase response:', { data, error });
+
+      if (error) {
+        console.error('AdminService.createReport - Supabase error details:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        throw error;
+      }
+
+      console.log('AdminService.createReport - Success! Report created:', data);
+    } catch (error: any) {
+      console.error('AdminService.createReport - Complete error:', error);
+      throw new Error(`Failed to create report: ${error.message || error}`);
+    }
+  }
+
   static async getReportedContent(): Promise<ReportedContent[]> {
     try {
       const { data, error } = await supabase
-        .from('admin_reported_content')
+        .from('reported_content')
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -194,7 +249,7 @@ class AdminService {
   ): Promise<void> {
     try {
       const { error } = await supabase
-        .from('admin_reported_content')
+        .from('reported_content')
         .update({
           status,
           admin_action: adminAction,
@@ -213,7 +268,7 @@ class AdminService {
   static async deleteReport(reportId: string): Promise<void> {
     try {
       const { error } = await supabase
-        .from('admin_reported_content')
+        .from('reported_content')
         .delete()
         .eq('id', reportId);
 
@@ -913,16 +968,64 @@ class AdminService {
     }
   }
 
-  static async banUser(banData: Partial<BannedUser>): Promise<void> {
+  static async banUser(banData: {
+    user_email: string;
+    user_name?: string;
+    duration_days?: number; // undefined = permanent, number = temporary in days
+    reason: string;
+    banned_by_admin: string;
+    admin_notes?: string;
+  }): Promise<void> {
     try {
+      const now = new Date();
+      
+      // Calculate ban duration and expiry based on existing schema
+      const isPermanent = !banData.duration_days;
+      const banDuration = banData.duration_days ? `${banData.duration_days} days` : null;
+      const expiresAt = banData.duration_days 
+        ? new Date(now.getTime() + banData.duration_days * 24 * 60 * 60 * 1000).toISOString()
+        : null;
+
+      const banRecord = {
+        user_email: banData.user_email,
+        user_name: banData.user_name || 'Unknown User',
+        reason: banData.reason,
+        banned_by: banData.banned_by_admin, // Note: using 'banned_by' to match schema
+        ban_duration: banDuration, // PostgreSQL interval format
+        is_permanent: isPermanent,
+        is_active: true,
+        expires_at: expiresAt,
+        created_at: now.toISOString(),
+        updated_at: now.toISOString()
+      };
+
+      console.log('Attempting to ban user with data:', banRecord);
+
+      // First, deactivate any existing active bans for this user
+      const { error: updateError } = await supabase
+        .from('admin_banned_users')
+        .update({ is_active: false, updated_at: now.toISOString() })
+        .eq('user_email', banData.user_email)
+        .eq('is_active', true);
+
+      if (updateError) {
+        console.warn('Warning updating existing bans:', updateError);
+      }
+
+      // Insert new ban
       const { error } = await supabase
         .from('admin_banned_users')
-        .insert([banData]);
+        .insert([banRecord]);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database error:', error);
+        throw error;
+      }
+      
+      console.log('✅ User banned successfully');
     } catch (error) {
       console.error('Error banning user:', error);
-      throw new Error('Failed to ban user');
+      throw new Error(`Failed to ban user: ${error.message}`);
     }
   }
 
@@ -1023,6 +1126,26 @@ class AdminService {
       // Don't throw error as this is not critical for main functionality
     }
   }
+
+
+
+
+
+  /**
+   * Get ban duration options for admin UI dropdowns
+   */
+  static getBanDurationOptions(): { label: string; value: number | null; description: string }[] {
+    return [
+      { label: '30 Days', value: 30, description: 'Temporary ban for 1 month' },
+      { label: '60 Days', value: 60, description: 'Temporary ban for 2 months' },
+      { label: '90 Days', value: 90, description: 'Temporary ban for 3 months' },
+      { label: '6 Months', value: 180, description: 'Temporary ban for 6 months' },
+      { label: '1 Year', value: 365, description: 'Temporary ban for 1 year' },
+      { label: 'Permanent', value: null, description: 'Permanent ban - user cannot return' }
+    ];
+  }
+
+
 }
 
 export default AdminService;

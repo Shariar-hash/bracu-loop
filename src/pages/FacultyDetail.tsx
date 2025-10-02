@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/select";
 
 interface Review {
+  id?: string; // Add optional id field for database operations
   faculty_initial: string;
   course_code?: string;
   rating: number;
@@ -118,8 +119,6 @@ const FacultyDetail: React.FC = () => {
 
   // Check if this is a reply to someone (has @mention at the start)
   const getReplyToInfo = (text: string) => {
-    console.log('Checking mention in text:', text);
-    
     // Try different mention patterns
     const patterns = [
       /^@(\w+)\s+(.*)$/,        // @username followed by space
@@ -131,7 +130,6 @@ const FacultyDetail: React.FC = () => {
     for (const pattern of patterns) {
       const match = text.match(pattern);
       if (match) {
-        console.log('Found mention match:', match);
         return {
           mentionedUser: match[1],
           remainingText: match[2] || ''
@@ -139,15 +137,11 @@ const FacultyDetail: React.FC = () => {
       }
     }
     
-    console.log('No mention found in:', text);
     return null;
   };
 
   // SIMPLE SOLUTION: Determine who this reply was directed to based on reply order
   const getReplyTarget = (reply: Review, parentReview: Review) => {
-    console.log('Getting reply target for:', reply.user_name, 'parent review by:', parentReview.user_name);
-    console.log('Parent review replies count:', parentReview.replies?.length || 0);
-    
     // If this is the first reply, it's replying to the main review author
     if (!parentReview.replies || parentReview.replies.length <= 1) {
       console.log('First reply - targeting main author:', parentReview.user_name);
@@ -408,38 +402,37 @@ const FacultyDetail: React.FC = () => {
           filter: `faculty_initial=eq.${facultyId}`
         },
         (payload) => {
-          console.log('Real-time update received:', payload);
+          console.log('🔄 Real-time update received for faculty:', facultyId, payload);
           
-          if (payload.eventType === 'INSERT') {
-            // New review added
-            const newReview = payload.new as Review;
-            setReviews(prev => [newReview, ...prev]);
+          // Only handle DELETE events for admin actions - let normal UI handle INSERT/UPDATE
+          if (payload.eventType === 'DELETE') {
+            // Review deleted by admin
+            const deletedReview = payload.old as any;
+            console.log('🗑️ DELETE event received:', deletedReview);
             
-            // Show toast if it's not the current user's review
-            if (user && newReview.user_email !== user.email) {
-              toast.info('New review posted!', {
-                description: `${newReview.user_name} shared their thoughts`
+            setReviews(prev => {
+              const filtered = prev.filter(review => {
+                // Simple matching by ID or timestamp
+                const matchById = deletedReview.id && review.id === deletedReview.id;
+                const matchByTimestamp = review.created_at === deletedReview.created_at && 
+                                       review.faculty_initial === deletedReview.faculty_initial;
+                
+                const isMatch = matchById || matchByTimestamp;
+                
+                if (isMatch) {
+                  console.log('✅ Removing deleted review from UI');
+                  // Only show toast if it wasn't deleted by current user
+                  if (user && review.user_email !== user.email) {
+                    toast.info('Review was removed by moderator');
+                  }
+                }
+                
+                return !isMatch; // Keep reviews that don't match
               });
-            }
-          } else if (payload.eventType === 'UPDATE') {
-            // Review updated
-            const updatedReview = payload.new as Review;
-            setReviews(prev => prev.map(review => 
-              review.created_at === updatedReview.created_at && 
-              review.faculty_initial === updatedReview.faculty_initial && 
-              (review.course_code || '') === (updatedReview.course_code || '')
-                ? updatedReview 
-                : review
-            ));
-          } else if (payload.eventType === 'DELETE') {
-            // Review deleted
-            const deletedReview = payload.old as Review;
-            setReviews(prev => prev.filter(review => 
-              !(review.created_at === deletedReview.created_at && 
-                review.faculty_initial === deletedReview.faculty_initial && 
-                (review.course_code || '') === (deletedReview.course_code || ''))
-            ));
+              return filtered;
+            });
           }
+          // For INSERT/UPDATE, let the normal UI operations handle them to avoid conflicts
         }
       )
       .subscribe();
@@ -457,9 +450,11 @@ const FacultyDetail: React.FC = () => {
         },
         (payload) => {
           console.log('Vote update received:', payload);
-          // Refresh user votes when votes change
-          if (user) {
-            fetchReviews();
+          // Only refresh votes if it's not the current user's action (to avoid double-updates)
+          const voteData = payload.new as any;
+          if (user && voteData?.user_email !== user.email) {
+            // Debounce the refresh to avoid too many calls
+            setTimeout(() => fetchReviews(), 1000);
           }
         }
       )
@@ -953,19 +948,36 @@ const FacultyDetail: React.FC = () => {
         description: reportDescription
       });
 
-      // Use our reporting system to capture the actual review content
-      const reportResult = await supabase.rpc('report_content', {
-        content_type_input: 'faculty_review',
-        content_id_input: `${reviewToReport.faculty_initial}_${reviewToReport.created_at}`, // Use faculty_initial + timestamp as ID
-        reason_input: reportReason,
-        description_input: reportDescription,
-        reporter_email_input: user.email,
-        reporter_name_input: user.name || user.email
-      });
+      // Create comprehensive content snapshot
+      const contentSnapshot = {
+        actual_content: reviewToReport.comment || '',
+        content_type: 'faculty_review',
+        faculty_initial: reviewToReport.faculty_initial,
+        course_code: reviewToReport.course_code || 'Unknown',
+        rating: reviewToReport.rating,
+        author_name: reviewToReport.user_name || '',
+        author_email: reviewToReport.user_email || '',
+        upvotes: reviewToReport.upvotes || 0,
+        downvotes: reviewToReport.downvotes || 0,
+        is_reply: !!reviewToReport.parent_faculty_initial,
+        parent_faculty_initial: reviewToReport.parent_faculty_initial || null,
+        parent_course_code: reviewToReport.parent_course_code || null,
+        parent_created_at: reviewToReport.parent_created_at || null,
+        captured_at: new Date().toISOString()
+      };
 
-      if (reportResult.error) {
-        throw reportResult.error;
-      }
+      console.log('Faculty review content snapshot prepared:', contentSnapshot);
+
+      // Use AdminService.createReport for consistent reporting
+      await AdminService.createReport({
+        content_type: 'faculty_review',
+        content_id: `${reviewToReport.faculty_initial}_${reviewToReport.created_at}`,
+        reason: reportReason,
+        description: reportDescription,
+        reporter_email: user.email || '',
+        reporter_name: user.name || user.email || 'Anonymous',
+        content_snapshot: contentSnapshot
+      });
 
       setReportModalOpen(false);
       setReviewToReport(null);
@@ -1354,8 +1366,23 @@ const FacultyDetail: React.FC = () => {
               Reviews ({reviews.length})
             </h2>
             
-            {/* Sort Filter */}
-            <div className="flex items-center gap-2 animate-in slide-in-from-right-4 fade-in duration-500 delay-400">
+            {/* Sort Filter and Refresh Button */}
+            <div className="flex items-center gap-2 sm:gap-3 animate-in slide-in-from-right-4 fade-in duration-500 delay-400">
+              <button
+                onClick={() => {
+                  console.log('🔄 Manual refresh triggered');
+                  fetchReviews();
+                  toast.info('Refreshing reviews...');
+                }}
+                className="flex items-center gap-1 px-2 py-1 text-sm bg-blue-100 hover:bg-blue-200 text-blue-600 hover:text-blue-700 dark:bg-blue-900 dark:hover:bg-blue-800 dark:text-blue-300 dark:hover:text-blue-200 rounded-lg transition-all duration-200 hover:scale-105"
+                title="Refresh reviews"
+              >
+                <svg className="h-3 w-3 sm:h-4 sm:w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span className="hidden sm:inline">Refresh</span>
+              </button>
+              
               <span className="text-sm text-slate-600 dark:text-slate-400">Sort by:</span>
               <select 
                 value={sortBy} 
@@ -1449,14 +1476,17 @@ const FacultyDetail: React.FC = () => {
                           {review.user_name || 'Anonymous'}
                         </p>
                         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-                          {new Date(review.created_at).toLocaleDateString('en-US', { 
-                            month: 'short', 
-                            day: 'numeric', 
-                            year: 'numeric',
-                            hour: 'numeric',
-                            minute: '2-digit',
-                            hour12: true
-                          })}
+                          {(() => {
+                            const date = new Date(review.created_at);
+                            return isNaN(date.getTime()) ? 'Recently' : date.toLocaleDateString('en-US', { 
+                              month: 'short', 
+                              day: 'numeric', 
+                              year: 'numeric',
+                              hour: 'numeric',
+                              minute: '2-digit',
+                              hour12: true
+                            });
+                          })()}
                         </p>
                       </div>
                     </div>
@@ -1791,13 +1821,16 @@ const FacultyDetail: React.FC = () => {
                                     })()}
                                   </div>
                                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                                    {new Date(reply.created_at).toLocaleDateString('en-US', { 
-                                      month: 'short', 
-                                      day: 'numeric', 
-                                      hour: 'numeric',
-                                      minute: '2-digit',
-                                      hour12: true
-                                    })}
+                                    {(() => {
+                                      const date = new Date(reply.created_at);
+                                      return isNaN(date.getTime()) ? 'Recently' : date.toLocaleDateString('en-US', { 
+                                        month: 'short', 
+                                        day: 'numeric', 
+                                        hour: 'numeric',
+                                        minute: '2-digit',
+                                        hour12: true
+                                      });
+                                    })()}
                                   </p>
                                 </div>
                               </div>

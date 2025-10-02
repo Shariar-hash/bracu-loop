@@ -90,7 +90,6 @@ const Questions = () => {
 
   const initializeData = async () => {
     try {
-      console.log('🔄 Initializing Questions data...');
       setLoading(true);
       
       // Load courses from database
@@ -162,7 +161,6 @@ const Questions = () => {
             ...course,
             category_id: '1' // Add category_id for compatibility with existing interface
           }));
-          console.log('✅ Loaded', coursesToUse.length, 'courses from database');
         }
       } catch (dbError) {
         console.error('Database error loading courses:', dbError);
@@ -180,10 +178,8 @@ const Questions = () => {
       const savedPapers = localStorage.getItem('questionPapers');
       if (savedPapers) {
         const papers = JSON.parse(savedPapers);
-        console.log('📁 Loaded', papers.length, 'papers from localStorage');
         setQuestionPapers(papers);
       } else {
-        console.log('📭 No saved papers found, starting empty');
         setQuestionPapers([]);
       }
       
@@ -229,19 +225,9 @@ const Questions = () => {
       let isSupabaseUpload = false;
       
       try {
-        console.log('Attempting Supabase upload...', { filePath, fileName: uploadData.file.name });
-        
-        // Debug Supabase connection
-        console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
-        console.log('Supabase Key exists:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
-        
-        // Note: Anon users can't list buckets, but can upload to them if policies allow
-        
         const { data, error } = await supabase.storage
           .from('question-papers')
           .upload(filePath, uploadData.file);
-          
-        console.log('Supabase upload result:', { data, error });
           
         if (!error && data) {
           // Get public URL
@@ -249,7 +235,6 @@ const Questions = () => {
             .from('question-papers')
             .getPublicUrl(filePath);
           
-          console.log('Public URL result:', urlData);
           fileUrl = urlData.publicUrl;
           isSupabaseUpload = true;
           toast.success('File uploaded to cloud storage successfully!');
@@ -312,17 +297,9 @@ const Questions = () => {
 
   const handleDownload = (paper: QuestionPaper) => {
     try {
-      console.log('Starting download for:', {
-        fileName: paper.file_name,
-        fileUrl: paper.file_url,
-        storagePath: paper.storage_path,
-        isBlob: paper.file_url.startsWith('blob:')
-      });
-      
       // Open in new tab and trigger download
       window.open(paper.file_url, '_blank');
       
-      console.log('Download opened in new tab');
       toast.success(`Opening ${paper.file_name} in new tab...`);
     } catch (error) {
       console.error('Download error:', error);
@@ -365,12 +342,10 @@ const Questions = () => {
         }
         
         // Remove from state AND localStorage
-        console.log('Removing paper from state:', paper.id);
         setQuestionPapers(prev => {
           const newPapers = prev.filter(p => p.id !== paper.id);
           // Update localStorage after deletion
           localStorage.setItem('questionPapers', JSON.stringify(newPapers));
-          console.log('Papers after deletion:', newPapers.length);
           return newPapers;
         });
         
@@ -396,13 +371,7 @@ const Questions = () => {
     }
 
     try {
-      console.log('Submitting question paper report:', {
-        paperId: paperToReport.id,
-        reason: reportReason,
-        description: reportDescription
-      });
-
-      // Use our reporting system to capture the actual paper content
+      // Use existing reporting system
       const reportResult = await supabase.rpc('report_content', {
         content_type_input: 'question_paper',
         content_id_input: paperToReport.id,

@@ -47,7 +47,8 @@ import {
   Edit,
   Mail,
   TrendingUp,
-  Activity
+  Activity,
+  Download
 } from "lucide-react";
 
 // Using imported types from AdminService
@@ -347,18 +348,40 @@ const AdminDashboard = () => {
                         selectedReport.reporter_name;
 
         if (userEmail && adminUser) {
-          await AdminService.banUser({
-            user_email: userEmail,
-            user_name: userName || 'Unknown User',
-            reason: `${selectedReport.reason}: ${notes || 'Admin action from report'}`,
-            banned_by: adminUser.username,
-            ban_duration: action === 'user_suspended' ? '30 days' : 'permanent',
-            is_active: true
+          try {
+            console.log(`🔨 Attempting to ${action === 'user_suspended' ? 'suspend' : 'ban'} user:`, {
+              email: userEmail,
+              name: userName,
+              action: action,
+              duration: action === 'user_suspended' ? '30 days' : 'permanent'
+            });
+
+            await AdminService.banUser({
+              user_email: userEmail,
+              user_name: userName || 'Unknown User',
+              reason: `${selectedReport.reason}: ${notes || 'Admin action from report'}`,
+              banned_by_admin: adminUser.username,
+              duration_days: action === 'user_suspended' ? 30 : undefined
+            });
+            
+            console.log(`✅ User successfully ${action === 'user_suspended' ? 'suspended for 30 days' : 'permanently banned'}`);
+          } catch (banError) {
+            console.error(`❌ Failed to ${action === 'user_suspended' ? 'suspend' : 'ban'} user:`, banError);
+            alert(`Failed to ${action === 'user_suspended' ? 'suspend' : 'ban'} user: ${banError.message}`);
+            return; // Don't proceed with report resolution if ban failed
+          }
+        } else {
+          console.warn('⚠️ Could not extract user information for banning:', {
+            userEmail,
+            userName,
+            hasAdminUser: !!adminUser,
+            contentSnapshot: selectedReport.content_snapshot
           });
           
-          console.log('✅ User successfully banned/suspended');
-        } else {
-          console.warn('⚠️ Could not extract user information for banning');
+          if (!userEmail) {
+            alert('Cannot ban/suspend user: No user email found in report data');
+            return;
+          }
         }
       }
       
@@ -1752,6 +1775,24 @@ const AdminDashboard = () => {
                             <span className="font-semibold">Rating:</span> {selectedReport.content_snapshot.rating}/5
                           </div>
                         )}
+                        {selectedReport.content_snapshot.file_name && (
+                          <div>
+                            <span className="font-semibold">File Name:</span> {selectedReport.content_snapshot.file_name}
+                          </div>
+                        )}
+                        {selectedReport.content_snapshot.file_url && (
+                          <div>
+                            <span className="font-semibold">File URL:</span> 
+                            <a 
+                              href={selectedReport.content_snapshot.file_url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="ml-2 text-blue-600 hover:text-blue-800 underline"
+                            >
+                              Download File
+                            </a>
+                          </div>
+                        )}
                       </div>
 
                       {/* Debug information */}
@@ -1784,6 +1825,43 @@ const AdminDashboard = () => {
                   )}
                 </div>
               </div>
+              
+              {/* Special handling for question papers */}
+              {selectedReport.content_type === 'question_paper' && (
+                <div className="border-t pt-4 bg-blue-50 dark:bg-blue-950 p-4 rounded-lg">
+                  <Label className="text-blue-700 dark:text-blue-300 font-semibold flex items-center gap-2">
+                    📄 Question Paper File Access
+                  </Label>
+                  
+                  {selectedReport.content_snapshot?.file_url ? (
+                    <div className="mt-3">
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => {
+                          if (selectedReport.content_snapshot?.file_url) {
+                            window.open(selectedReport.content_snapshot.file_url, '_blank');
+                          }
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
+                      >
+                        <Download className="h-4 w-4" />
+                        Download & Review File
+                      </Button>
+                      <div className="text-sm text-blue-700 dark:text-blue-300 mt-2">
+                        📁 <strong>File:</strong> {selectedReport.content_snapshot.file_name || 'Unknown filename'}
+                      </div>
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mt-2 italic">
+                        💡 Click to download and review the reported question paper before taking action
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="mt-3 text-sm text-orange-600 dark:text-orange-400">
+                      ⚠️ File URL not available - may need to check database or file storage
+                    </div>
+                  )}
+                </div>
+              )}
               
               <div className="flex gap-2">
                 <Button 
