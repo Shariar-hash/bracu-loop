@@ -376,9 +376,33 @@ class AdminService {
         }
         
       } else if (contentType === 'question_paper') {
-        const { error } = await supabase.from('question-papers').delete().eq('id', contentId);
-        deleteError = error;
-        deleted = !error;
+        // Get question details first to find owner email (admin can bypass ownership)
+        const { data: question } = await supabase
+          .from('question_papers')
+          .select('uploaded_by_email, storage_path, title')
+          .eq('id', parseInt(contentId))
+          .single();
+        
+        if (question) {
+          // Admin delete - delete storage file first
+          if (question.storage_path) {
+            const { error: storageError } = await supabase.storage
+              .from('question-papers')
+              .remove([question.storage_path]);
+            
+            if (storageError) {
+              console.warn('Storage delete warning:', storageError.message);
+            }
+          }
+          
+          // Then delete from database
+          const { error } = await supabase.from('question_papers').delete().eq('id', parseInt(contentId));
+          deleteError = error;
+          deleted = !error;
+        } else {
+          deleteError = new Error('Question not found');
+          deleted = false;
+        }
       }
 
       if (deleteError) {

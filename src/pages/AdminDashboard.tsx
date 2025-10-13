@@ -311,22 +311,20 @@ const AdminDashboard = () => {
       
       // If action is content removal, delete the actual content from the website
       if (action === 'content_removed' && selectedReport) {
-        console.log('Admin removing actual content:', {
-          reportId,
-          contentType: selectedReport.content_type,
-          contentId: selectedReport.content_id,
-          contentSnapshot: selectedReport.content_snapshot
-        });
-        
-        const deleted = await AdminService.deleteActualContent(
-          selectedReport.content_type,
-          selectedReport.content_id
-        );
-        
-        if (deleted) {
-          console.log('✅ Successfully deleted actual content from website');
-        } else {
-          console.warn('⚠️ Content may have already been deleted or not found');
+        try {
+          const deleted = await AdminService.deleteActualContent(
+            selectedReport.content_type,
+            selectedReport.content_id
+          );
+          
+          if (deleted) {
+            toast.success(`${selectedReport.content_type} deleted successfully`);
+          } else {
+            toast.warning('Content may have already been deleted');
+          }
+        } catch (error) {
+          console.error('Error deleting content:', error);
+          toast.error('Failed to delete content: ' + error.message);
         }
       }
 

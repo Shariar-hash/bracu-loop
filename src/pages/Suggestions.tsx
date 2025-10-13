@@ -1132,13 +1132,13 @@ const Suggestions = () => {
                               <span className="text-xs sm:text-sm">{post.comments_count}</span>
                             </Button>
                           </div>
-                          {post.author_email !== user?.email && (
+                          {user && (
                             <Button 
                               variant="ghost" 
                               size="sm" 
                               className="p-1 sm:p-2"
                               onClick={() => reportPost(post.id)}
-                              title="Report inappropriate content"
+                              title="Report content (Testing enabled for own posts)"
                             >
                               <Flag className="h-3 w-3 sm:h-4 sm:w-4" />
                             </Button>
@@ -1258,13 +1258,13 @@ const Suggestions = () => {
                                     )}
                                     
                                     {/* Report functionality */}
-                                    {user && comment.author_email !== user.email && (
+                                    {user && (
                                       <Button
                                         size="sm"
                                         variant="ghost"
                                         className="text-xs p-1 text-orange-500 hover:text-orange-700"
                                         onClick={() => reportComment(comment.id, comment.author_name)}
-                                        title="Report inappropriate content"
+                                        title="Report content (Testing enabled for own comments)"
                                       >
                                         <Flag className="h-3 w-3" />
                                       </Button>
@@ -1380,13 +1380,13 @@ const Suggestions = () => {
                                           )}
                                           
                                           {/* Report functionality */}
-                                          {user && reply.author_email !== user.email && (
+                                          {user && (
                                             <Button
                                               size="sm"
                                               variant="ghost"
                                               className="text-xs p-1 text-orange-500 hover:text-orange-700"
                                               onClick={() => reportComment(reply.id, reply.author_name)}
-                                              title="Report inappropriate content"
+                                              title="Report content (Testing enabled for own replies)"
                                             >
                                               <Flag className="h-3 w-3" />
                                             </Button>

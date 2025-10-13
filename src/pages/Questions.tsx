@@ -27,6 +27,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import AdminService from "@/lib/adminService";
+import { QuestionService, type QuestionPaper as DatabaseQuestionPaper } from "@/lib/questionService";
 
 interface Course {
   id: string;
@@ -36,7 +37,7 @@ interface Course {
 }
 
 interface QuestionPaper {
-  id: string;
+  id: number; // Changed to number to match database
   title: string;
   course_code: string;
   course_name: string;
@@ -87,6 +88,39 @@ const Questions = () => {
       });
     };
   }, []);
+
+  const loadQuestionPapers = async () => {
+    try {
+      const result = await QuestionService.getQuestions({
+        limit: 100 // Load all questions
+      });
+      
+      // Convert database format to component format
+      const convertedPapers = result.questions.map(q => ({
+        id: q.id,
+        title: q.title,
+        course_code: q.course_code,
+        course_name: q.course_name || '',
+        semester: q.semester,
+        year: q.year,
+        exam_type: q.exam_type,
+        file_url: q.file_url,
+        file_name: q.file_name,
+        uploaded_at: q.uploaded_at,
+        uploaded_by_email: q.uploaded_by_email,
+        uploaded_by_name: q.uploaded_by_name,
+        is_approved: true, // Database only returns approved questions
+        storage_path: q.storage_path,
+        file_blob: undefined // Not used for database storage
+      }));
+      
+      setQuestionPapers(convertedPapers);
+    } catch (error) {
+      console.error('Error loading question papers:', error);
+      toast.error('Failed to load question papers');
+      setQuestionPapers([]);
+    }
+  };
 
   const initializeData = async () => {
     try {
@@ -174,14 +208,9 @@ const Questions = () => {
       }
 
       setCourses(coursesToUse);
-      // Load existing papers from localStorage
-      const savedPapers = localStorage.getItem('questionPapers');
-      if (savedPapers) {
-        const papers = JSON.parse(savedPapers);
-        setQuestionPapers(papers);
-      } else {
-        setQuestionPapers([]);
-      }
+      
+      // Load existing papers from database instead of localStorage
+      await loadQuestionPapers();
       
     } catch (error) {
       console.error('Error initializing data:', error);
@@ -218,64 +247,29 @@ const Questions = () => {
       // Generate unique file name
       const fileExt = uploadData.file.name.split('.').pop();
       const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const filePath = `question-papers/${fileName}`;
-      
-      // Try to upload to Supabase Storage (if configured)
-      let fileUrl = '';
-      let isSupabaseUpload = false;
-      
-      try {
-        const { data, error } = await supabase.storage
-          .from('question-papers')
-          .upload(filePath, uploadData.file);
-          
-        if (!error && data) {
-          // Get public URL
-          const { data: urlData } = supabase.storage
-            .from('question-papers')
-            .getPublicUrl(filePath);
-          
-          fileUrl = urlData.publicUrl;
-          isSupabaseUpload = true;
-          toast.success('File uploaded to cloud storage successfully!');
-        } else {
-          throw new Error(`Supabase upload failed: ${error?.message || 'Unknown error'}`);
-        }
-      } catch (supabaseError) {
-        // Fallback to blob URL for local storage
-        console.error('Supabase error details:', supabaseError);
-        toast.error(`Supabase failed: ${supabaseError.message}`);
-        fileUrl = URL.createObjectURL(uploadData.file);
-        blobUrls.current.push(fileUrl);
-        toast.success('File uploaded successfully!');
-      }
-      
-      // Create new paper object
-      const newPaper = {
-        id: Date.now().toString(),
+      // Upload using the new database service
+      const questionMetadata = {
         title: uploadData.title,
         course_code: selectedCourseForUpload,
         course_name: courses.find(c => c.course_code === selectedCourseForUpload)?.course_name || '',
         semester: uploadData.semester,
         year: uploadData.year,
         exam_type: uploadData.exam_type,
-        file_url: fileUrl,
         file_name: uploadData.file.name,
-        uploaded_at: new Date().toISOString(),
-        uploaded_by_email: user.email,
+        file_size: uploadData.file.size,
+        file_type: uploadData.file.type,
         uploaded_by_name: user.name || user.email,
-        is_approved: true,
-        file_blob: isSupabaseUpload ? undefined : uploadData.file, // Only store blob for local files
-        storage_path: isSupabaseUpload ? filePath : undefined // Track Supabase path for deletion
+        uploaded_by_email: user.email
       };
 
-      // Add to local state AND save to localStorage for persistence
-      setQuestionPapers(prev => {
-        const updated = [newPaper, ...prev];
-        // Save to localStorage so files survive page refresh
-        localStorage.setItem('questionPapers', JSON.stringify(updated));
-        return updated;
-      });
+      const result = await QuestionService.uploadFile(uploadData.file, questionMetadata);
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Upload failed');
+      }
+      
+      // Reload the questions from database to show the new upload
+      await loadQuestionPapers();
 
       toast.success('Question paper uploaded successfully!');
       setUploadDialogOpen(false);
@@ -295,12 +289,20 @@ const Questions = () => {
     }
   };
 
-  const handleDownload = (paper: QuestionPaper) => {
+  const handleDownload = async (paper: QuestionPaper) => {
     try {
+      // Record download in database if user is authenticated
+      if (user) {
+        await QuestionService.recordDownload(paper.id, user.email, user.name);
+      }
+      
       // Open in new tab and trigger download
       window.open(paper.file_url, '_blank');
       
       toast.success(`Opening ${paper.file_name} in new tab...`);
+      
+      // Reload to update download count
+      await loadQuestionPapers();
     } catch (error) {
       console.error('Download error:', error);
       toast.error('Failed to download file');
@@ -313,46 +315,19 @@ const Questions = () => {
       return;
     }
 
-    // Check if user is the uploader
-    if (paper.uploaded_by_email !== user.email) {
-      toast.error('You can only delete files you uploaded');
-      return;
-    }
-
     // Confirm deletion
     if (window.confirm(`Are you sure you want to delete "${paper.title}"?`)) {
       try {
-        // Delete from Supabase storage if it's stored there
-        if (paper.storage_path) {
-          const { error } = await supabase.storage
-            .from('question-papers')
-            .remove([paper.storage_path]);
-          
-          if (error) {
-            console.error('Supabase delete error:', error);
-            // Continue with local deletion even if cloud deletion fails
-          }
-        }
+        // Use the database service to delete
+        await QuestionService.deleteQuestion(paper.id, user.email);
         
-        // Revoke blob URL if it's a local blob
-        if (paper.file_blob && paper.file_url.startsWith('blob:')) {
-          URL.revokeObjectURL(paper.file_url);
-          // Remove from tracked URLs
-          blobUrls.current = blobUrls.current.filter(url => url !== paper.file_url);
-        }
-        
-        // Remove from state AND localStorage
-        setQuestionPapers(prev => {
-          const newPapers = prev.filter(p => p.id !== paper.id);
-          // Update localStorage after deletion
-          localStorage.setItem('questionPapers', JSON.stringify(newPapers));
-          return newPapers;
-        });
+        // Reload questions from database
+        await loadQuestionPapers();
         
         toast.success('File deleted successfully');
       } catch (error) {
         console.error('Delete error:', error);
-        toast.error('Failed to delete file');
+        toast.error(error.message || 'Failed to delete file');
       }
     }
   };
@@ -371,19 +346,31 @@ const Questions = () => {
     }
 
     try {
-      // Use our reporting system to capture the actual paper content
-      const reportResult = await supabase.rpc('report_content', {
-        content_type_input: 'question_paper',
-        content_id_input: paperToReport.id,
-        reason_input: reportReason,
-        description_input: reportDescription,
-        reporter_email_input: user.email,
-        reporter_name_input: user.name || user.email
+      console.log('🚨 Submitting report...', {
+        content_type: 'question_paper',
+        content_id: paperToReport.id.toString(),
+        reason: reportReason,
+        reporter: user.email
       });
 
-      if (reportResult.error) {
-        throw reportResult.error;
-      }
+      // Use existing AdminService to report content (consistent with faculty reviews)
+      await AdminService.createReport({
+        content_type: 'question_paper' as const,
+        content_id: paperToReport.id.toString(),
+        reason: reportReason,
+        description: reportDescription,
+        reporter_email: user.email,
+        reporter_name: user.name || user.email,
+        content_snapshot: {
+          title: paperToReport.title,
+          course_code: paperToReport.course_code,
+          file_name: paperToReport.file_name,
+          uploaded_by: paperToReport.uploaded_by_name,
+          file_url: paperToReport.file_url
+        }
+      });
+
+      console.log('🚨 Report submitted successfully via AdminService');
 
       setReportModalOpen(false);
       setPaperToReport(null);
@@ -642,13 +629,13 @@ const Questions = () => {
                                 >
                                   <Download className="h-3 w-3 sm:h-4 sm:w-4" />
                                 </Button>
-                                {user && paper.uploaded_by_email !== user.email && (
+                                {user && (
                                   <Button
                                     size="sm"
                                     variant="ghost"
                                     className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 p-1 sm:p-2"
                                     onClick={() => handleReportPaper(paper)}
-                                    title="Report inappropriate content"
+                                    title="Report content (Testing enabled for own files)"
                                   >
                                     <Flag className="h-3 w-3 sm:h-4 sm:w-4" />
                                   </Button>
