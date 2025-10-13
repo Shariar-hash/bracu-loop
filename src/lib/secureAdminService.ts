@@ -1,4 +1,7 @@
 import { supabase } from './supabaseClient';
+import EmailService from './emailService';
+import SimpleEmailNotifier from './simpleEmailNotifier';
+import emailjs from '@emailjs/browser';
 
 export interface AdminUser {
   id: string;
@@ -249,10 +252,230 @@ class SecureAdminService {
         throw error;
       }
 
+      // Send email notification via EmailJS and fallback
+      try {
+        await SecureAdminService.sendEmailJSNotification({
+          id: data.id,
+          student_name: cleanData.student_name,
+          student_email: cleanData.student_email,
+          subject: cleanData.subject,
+          message: cleanData.message,
+          submitted_at: data.submitted_at || new Date().toISOString()
+        });
+      } catch (emailError) {
+        console.error('Failed to send email notification:', emailError);
+      }
+
       return data.id;
     } catch (error: any) {
       console.error('Contact form submission error');
       throw new Error('Failed to submit contact form');
+    }
+  }
+
+  // Send email notification via EmailJS (simpler than webhooks!)
+  private static async sendEmailJSNotification(contactData: {
+    id: string;
+    student_name: string;
+    student_email: string;
+    subject: string;
+    message: string;
+    submitted_at: string;
+  }): Promise<void> {
+    // EmailJS configuration
+    const emailjsConfig = {
+      serviceId: 'service_t65amr9',
+      templateId: 'template_f4q3mzh',
+      publicKey: 'l6u-pMXlgYyXxdumb'
+    };
+
+    try {
+      // Initialize EmailJS with public key
+      emailjs.init(emailjsConfig.publicKey);
+      console.log('📧 EmailJS initialized successfully with public key');
+    } catch (initError) {
+      console.error('❌ EmailJS initialization failed:', initError);
+      throw new Error('EmailJS init failed: ' + initError.message);
+    }
+
+    // Template parameters that match your EmailJS template variables
+    const templateParams = {
+      name: contactData.student_name,      // matches {{name}} in template
+      email: contactData.student_email,    // matches {{email}} in template  
+      subject: contactData.subject,        // matches {{subject}} in template
+      message: contactData.message,        // matches {{message}} in template
+      time: new Date(contactData.submitted_at).toLocaleString(),
+      submission_id: contactData.id
+    };
+
+    try {
+      // Use the simpler emailjs.send method
+      const result = await emailjs.send(
+        emailjsConfig.serviceId,
+        emailjsConfig.templateId,
+        templateParams
+      );
+      
+      return; // Success - don't run fallback
+      
+    } catch (error: any) {
+      // Use fallback method when EmailJS fails
+      SecureAdminService.sendFallbackNotification(contactData);
+    }
+  }
+
+  // Keep webhook method as backup
+  static async sendWebhookNotification(contactData: {
+    id: string;
+    student_name: string;
+    student_email: string;
+    subject: string;
+    message: string;
+    submitted_at: string;
+  }): Promise<void> {
+    const webhookUrls = [
+      // Replace with your actual webhook URLs
+      'https://hook.us1.make.com/YOUR_WEBHOOK_URL_HERE', // Replace with your Make.com webhook
+      'https://hooks.zapier.com/hooks/catch/YOUR_ZAPIER_URL_HERE', // Replace with your Zapier webhook (optional)
+    ];
+
+    const emailPayload = {
+      to: ['montasirshariar@gmail.com', 'fahimsifat12345@gmail.com'],
+      subject: `[BRACU Loop] New Contact: ${contactData.subject}`,
+      html: this.generateEmailHTML(contactData),
+      text: this.generateEmailText(contactData),
+      contact_data: contactData
+    };
+
+    // Try each webhook URL
+    for (const webhookUrl of webhookUrls) {
+      if (webhookUrl.includes('placeholder')) {
+        console.log('⚠️ Webhook URL not configured, using fallback method');
+        continue;
+      }
+
+      try {
+        const response = await fetch(webhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(emailPayload)
+        });
+
+        if (response.ok) {
+          console.log('✅ Webhook notification sent successfully');
+          return; // Success, exit early
+        } else {
+          console.log(`⚠️ Webhook failed with status: ${response.status}`);
+        }
+      } catch (error) {
+        console.error(`❌ Webhook error for ${webhookUrl}:`, error);
+      }
+    }
+
+    // Fallback: Use simple notification method
+    console.log('📧 Webhook failed, using fallback email method');
+    SecureAdminService.sendFallbackNotification(contactData);
+  }
+
+  // Generate HTML email content
+  static generateEmailHTML(contactData: any): string {
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; }
+        .header { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .content { padding: 20px; border: 1px solid #e9ecef; border-radius: 8px; }
+        .message-box { background: #f1f3f5; padding: 15px; border-left: 4px solid #0066cc; margin: 15px 0; }
+        .footer { margin-top: 20px; font-size: 12px; color: #666; border-top: 1px solid #eee; padding-top: 15px; }
+        .button { display: inline-block; padding: 10px 20px; background: #0066cc; color: white; text-decoration: none; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>🔔 New Contact Message - BRACU Loop</h2>
+        <p>A student has submitted a new message through the contact form.</p>
+    </div>
+    
+    <div class="content">
+        <p><strong>From:</strong> ${contactData.student_name}</p>
+        <p><strong>Email:</strong> <a href="mailto:${contactData.student_email}">${contactData.student_email}</a></p>
+        <p><strong>Subject:</strong> ${contactData.subject}</p>
+        <p><strong>Submitted:</strong> ${new Date(contactData.submitted_at).toLocaleString()}</p>
+        
+        <div class="message-box">
+            <p><strong>Message:</strong></p>
+            <p>${contactData.message.replace(/\n/g, '<br>')}</p>
+        </div>
+        
+        <p>
+            <a href="mailto:${contactData.student_email}?subject=Re: ${encodeURIComponent(contactData.subject)}" class="button">
+                Reply to Student
+            </a>
+        </p>
+    </div>
+    
+    <div class="footer">
+        <p><strong>How to respond:</strong></p>
+        <p>1. Click "Reply to Student" button above</p>
+        <p>2. Or send email directly to: ${contactData.student_email}</p>
+        <p>3. View in admin dashboard for more options</p>
+        <hr>
+        <p>Submission ID: ${contactData.id}</p>
+        <p>This is an automated notification from BRACU Loop</p>
+    </div>
+</body>
+</html>`;
+  }
+
+  // Generate plain text email content
+  static generateEmailText(contactData: any): string {
+    return `
+🔔 New Contact Message - BRACU Loop
+
+From: ${contactData.student_name}
+Email: ${contactData.student_email}
+Subject: ${contactData.subject}
+Submitted: ${new Date(contactData.submitted_at).toLocaleString()}
+
+Message:
+${contactData.message}
+
+---
+Reply to: ${contactData.student_email}
+Submission ID: ${contactData.id}
+
+This is an automated notification from BRACU Loop.
+    `.trim();
+  }
+
+  // Fallback notification method
+  static sendFallbackNotification(contactData: any): void {
+    // Create a visible notification in the console with formatting
+    console.log('%c📧 NEW CONTACT MESSAGE', 'background: #0066cc; color: white; padding: 8px; border-radius: 4px; font-weight: bold;');
+    console.log(`From: ${contactData.student_name} (${contactData.student_email})`);
+    console.log(`Subject: ${contactData.subject}`);
+    console.log(`Message: ${contactData.message}`);
+    console.log(`Submitted: ${new Date(contactData.submitted_at).toLocaleString()}`);
+    console.log(`ID: ${contactData.id}`);
+    
+    // Try to open a mailto link as last resort
+    try {
+      const mailtoLink = `mailto:montasirshariar@gmail.com,fahimsifat12345@gmail.com?subject=${encodeURIComponent(`[BRACU Loop] New Contact: ${contactData.subject}`)}&body=${encodeURIComponent(this.generateEmailText(contactData))}`;
+      
+      const link = document.createElement('a');
+      link.href = mailtoLink;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      console.log('📬 Mailto link opened - check your default email client');
+    } catch (error) {
+      console.error('Mailto fallback also failed:', error);
     }
   }
 
@@ -288,6 +511,17 @@ class SecureAdminService {
         throw new Error('Reply cannot be empty');
       }
 
+      // First, get the submission details for the email
+      const { data: submission, error: fetchError } = await supabase
+        .from('admin_contact_submissions')
+        .select('*')
+        .eq('id', submissionId)
+        .single();
+
+      if (fetchError || !submission) {
+        throw new Error('Contact submission not found');
+      }
+
       // Update submission with reply
       const { error } = await supabase
         .from('admin_contact_submissions')
@@ -303,8 +537,21 @@ class SecureAdminService {
         throw error;
       }
 
-      // TODO: Send email to student (implement email service)
-      // await this.sendEmailToStudent(submission.student_email, reply);
+      // Send email notification to student
+      try {
+        await EmailService.notifyStudentReply({
+          studentName: submission.student_name,
+          studentEmail: submission.student_email,
+          originalSubject: submission.subject,
+          originalMessage: submission.message,
+          adminReply: cleanReply,
+          repliedBy: adminName,
+          repliedAt: new Date().toISOString()
+        });
+      } catch (emailError) {
+        console.error('Failed to send reply notification email:', emailError);
+        // Don't throw error here - reply should still be recorded
+      }
       
     } catch (error) {
       console.error('Failed to reply to contact submission');

@@ -348,40 +348,18 @@ const AdminDashboard = () => {
                         selectedReport.reporter_name;
 
         if (userEmail && adminUser) {
-          try {
-            console.log(`🔨 Attempting to ${action === 'user_suspended' ? 'suspend' : 'ban'} user:`, {
-              email: userEmail,
-              name: userName,
-              action: action,
-              duration: action === 'user_suspended' ? '30 days' : 'permanent'
-            });
-
-            await AdminService.banUser({
-              user_email: userEmail,
-              user_name: userName || 'Unknown User',
-              reason: `${selectedReport.reason}: ${notes || 'Admin action from report'}`,
-              banned_by_admin: adminUser.username,
-              duration_days: action === 'user_suspended' ? 30 : undefined
-            });
-            
-            console.log(`✅ User successfully ${action === 'user_suspended' ? 'suspended for 30 days' : 'permanently banned'}`);
-          } catch (banError) {
-            console.error(`❌ Failed to ${action === 'user_suspended' ? 'suspend' : 'ban'} user:`, banError);
-            alert(`Failed to ${action === 'user_suspended' ? 'suspend' : 'ban'} user: ${banError.message}`);
-            return; // Don't proceed with report resolution if ban failed
-          }
-        } else {
-          console.warn('⚠️ Could not extract user information for banning:', {
-            userEmail,
-            userName,
-            hasAdminUser: !!adminUser,
-            contentSnapshot: selectedReport.content_snapshot
+          await AdminService.banUser({
+            user_email: userEmail,
+            user_name: userName || 'Unknown User',
+            reason: `${selectedReport.reason}: ${notes || 'Admin action from report'}`,
+            banned_by: adminUser.username,
+            ban_duration: action === 'user_suspended' ? '30 days' : 'permanent',
+            is_active: true
           });
           
-          if (!userEmail) {
-            alert('Cannot ban/suspend user: No user email found in report data');
-            return;
-          }
+          console.log('✅ User successfully banned/suspended');
+        } else {
+          console.warn('⚠️ Could not extract user information for banning');
         }
       }
       

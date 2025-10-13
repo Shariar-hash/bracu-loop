@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,8 +12,10 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Mail, Send, MessageSquare, AlertCircle } from 'lucide-react';
+import { Mail, Send, MessageSquare, AlertCircle, User } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 import SecureAdminService from '@/lib/secureAdminService';
+import { TestContactService } from '@/lib/testContactService';
 
 interface ContactFormData {
   student_name: string;
@@ -23,6 +25,7 @@ interface ContactFormData {
 }
 
 const ContactForm = () => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState<ContactFormData>({
     student_name: '',
     student_email: '',
@@ -31,6 +34,17 @@ const ContactForm = () => {
   });
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+
+  // Auto-fill user data when component mounts or user changes
+  useEffect(() => {
+    if (user) {
+      setFormData(prev => ({
+        ...prev,
+        student_name: user.name || '',
+        student_email: user.email || ''
+      }));
+    }
+  }, [user]);
 
   const handleInputChange = (field: keyof ContactFormData, value: string) => {
     setFormData(prev => ({
@@ -55,13 +69,18 @@ const ContactForm = () => {
       toast.error('Please enter a valid email address');
       return;
     }
-
     setLoading(true);
     try {
-      const submissionId = await SecureAdminService.submitContactForm(formData);
+      // Use the basic contact form without message_type for now
+      const submissionId = await SecureAdminService.submitContactForm({
+        student_name: formData.student_name,
+        student_email: formData.student_email,
+        subject: formData.subject,
+        message: formData.message
+      });
       
       toast.success('Your message has been sent successfully!', {
-        description: 'We will get back to you within 24 hours.'
+        description: 'Admin team will reply to your email within 24 hours.'
       });
       
       setSubmitted(true);
@@ -69,17 +88,40 @@ const ContactForm = () => {
       // Reset form after short delay
       setTimeout(() => {
         setFormData({
-          student_name: '',
-          student_email: '',
+          student_name: user?.name || '',
+          student_email: user?.email || '',
           subject: '',
           message: ''
         });
         setSubmitted(false);
       }, 3000);
       
-    } catch (error) {
-      console.error('Contact form submission failed');
-      toast.error('Failed to send message. Please try again.');
+    } catch (error: any) {
+      console.error('Contact form submission failed:', error);
+      
+      // Show detailed error information for debugging
+      let errorMessage = 'Failed to send message. Please try again.';
+      
+      if (error?.message) {
+        errorMessage = error.message;
+      }
+      
+      if (error?.details) {
+        console.error('Error details:', error.details);
+        errorMessage += ` Details: ${error.details}`;
+      }
+      
+      if (error?.hint) {
+        console.error('Error hint:', error.hint);
+        errorMessage += ` Hint: ${error.hint}`;
+      }
+      
+      // Show the detailed error
+      toast.error(errorMessage);
+      
+      // Also show a user-friendly notification
+      toast.error('Debug info logged to console. Please check browser console for details.');
+      
     } finally {
       setLoading(false);
     }
@@ -117,6 +159,12 @@ const ContactForm = () => {
           <p className="text-gray-600 mt-2">
             Send us a message and get a direct email reply from our admin team
           </p>
+          {user && (
+            <div className="flex items-center justify-center gap-2 mt-3 text-sm text-blue-600">
+              <User className="w-4 h-4" />
+              <span>Signed in as: {user.name} ({user.email})</span>
+            </div>
+          )}
         </CardHeader>
         
         <CardContent>
@@ -129,10 +177,14 @@ const ContactForm = () => {
                   type="text"
                   value={formData.student_name}
                   onChange={(e) => handleInputChange('student_name', e.target.value)}
-                  placeholder="Enter your full name"
+                  placeholder={user ? "Auto-filled from your account" : "Enter your full name"}
                   maxLength={100}
+                  disabled={loading || !!user}
                   required
                 />
+                {user && (
+                  <p className="text-xs text-green-600 mt-1">✓ Auto-filled from your Google account</p>
+                )}
               </div>
               
               <div>
@@ -142,10 +194,14 @@ const ContactForm = () => {
                   type="email"
                   value={formData.student_email}
                   onChange={(e) => handleInputChange('student_email', e.target.value)}
-                  placeholder="your.email@g.bracu.ac.bd"
+                  placeholder={user ? "Auto-filled from your account" : "your.email@g.bracu.ac.bd"}
                   maxLength={100}
+                  disabled={loading || !!user}
                   required
                 />
+                {user && (
+                  <p className="text-xs text-green-600 mt-1">✓ Auto-filled from your Google account</p>
+                )}
               </div>
             </div>
 
@@ -212,6 +268,32 @@ const ContactForm = () => {
                     <li>• For urgent matters, include "URGENT" in your subject</li>
                   </ul>
                 </div>
+              </div>
+            </div>
+
+            {/* Debug section - remove in production */}
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div className="text-sm text-yellow-800">
+                <p className="font-medium mb-2">🔧 Debug Tools:</p>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    // Load and run database test
+                    const script = document.createElement('script');
+                    script.src = '/test-db.js';
+                    script.onload = () => {
+                      // @ts-ignore
+                      window.testDB();
+                    };
+                    document.head.appendChild(script);
+                  }}
+                  className="px-3 py-1 bg-yellow-200 text-yellow-800 rounded text-xs hover:bg-yellow-300"
+                >
+                  Test Database Connection
+                </button>
+                <p className="text-xs mt-2 text-yellow-600">
+                  Click to test database connection and permissions. Check browser console for results.
+                </p>
               </div>
             </div>
 

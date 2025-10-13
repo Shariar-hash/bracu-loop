@@ -968,64 +968,16 @@ class AdminService {
     }
   }
 
-  static async banUser(banData: {
-    user_email: string;
-    user_name?: string;
-    duration_days?: number; // undefined = permanent, number = temporary in days
-    reason: string;
-    banned_by_admin: string;
-    admin_notes?: string;
-  }): Promise<void> {
+  static async banUser(banData: Partial<BannedUser>): Promise<void> {
     try {
-      const now = new Date();
-      
-      // Calculate ban duration and expiry based on existing schema
-      const isPermanent = !banData.duration_days;
-      const banDuration = banData.duration_days ? `${banData.duration_days} days` : null;
-      const expiresAt = banData.duration_days 
-        ? new Date(now.getTime() + banData.duration_days * 24 * 60 * 60 * 1000).toISOString()
-        : null;
-
-      const banRecord = {
-        user_email: banData.user_email,
-        user_name: banData.user_name || 'Unknown User',
-        reason: banData.reason,
-        banned_by: banData.banned_by_admin, // Note: using 'banned_by' to match schema
-        ban_duration: banDuration, // PostgreSQL interval format
-        is_permanent: isPermanent,
-        is_active: true,
-        expires_at: expiresAt,
-        created_at: now.toISOString(),
-        updated_at: now.toISOString()
-      };
-
-      console.log('Attempting to ban user with data:', banRecord);
-
-      // First, deactivate any existing active bans for this user
-      const { error: updateError } = await supabase
-        .from('admin_banned_users')
-        .update({ is_active: false, updated_at: now.toISOString() })
-        .eq('user_email', banData.user_email)
-        .eq('is_active', true);
-
-      if (updateError) {
-        console.warn('Warning updating existing bans:', updateError);
-      }
-
-      // Insert new ban
       const { error } = await supabase
         .from('admin_banned_users')
-        .insert([banRecord]);
+        .insert([banData]);
 
-      if (error) {
-        console.error('Database error:', error);
-        throw error;
-      }
-      
-      console.log('✅ User banned successfully');
+      if (error) throw error;
     } catch (error) {
       console.error('Error banning user:', error);
-      throw new Error(`Failed to ban user: ${error.message}`);
+      throw new Error('Failed to ban user');
     }
   }
 
@@ -1126,26 +1078,6 @@ class AdminService {
       // Don't throw error as this is not critical for main functionality
     }
   }
-
-
-
-
-
-  /**
-   * Get ban duration options for admin UI dropdowns
-   */
-  static getBanDurationOptions(): { label: string; value: number | null; description: string }[] {
-    return [
-      { label: '30 Days', value: 30, description: 'Temporary ban for 1 month' },
-      { label: '60 Days', value: 60, description: 'Temporary ban for 2 months' },
-      { label: '90 Days', value: 90, description: 'Temporary ban for 3 months' },
-      { label: '6 Months', value: 180, description: 'Temporary ban for 6 months' },
-      { label: '1 Year', value: 365, description: 'Temporary ban for 1 year' },
-      { label: 'Permanent', value: null, description: 'Permanent ban - user cannot return' }
-    ];
-  }
-
-
 }
 
 export default AdminService;

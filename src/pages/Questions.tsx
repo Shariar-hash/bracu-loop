@@ -371,7 +371,7 @@ const Questions = () => {
     }
 
     try {
-      // Use existing reporting system
+      // Use our reporting system to capture the actual paper content
       const reportResult = await supabase.rpc('report_content', {
         content_type_input: 'question_paper',
         content_id_input: paperToReport.id,
