@@ -340,9 +340,13 @@ const AdminDashboard = () => {
         // Extract user info from the report content snapshot
         const userEmail = selectedReport.content_snapshot?.author_email || 
                          selectedReport.content_snapshot?.user_email ||
+                         selectedReport.content_snapshot?.uploaded_by_email ||
+                         selectedReport.content_snapshot?.uploader_email ||
                          selectedReport.reporter_email;
         const userName = selectedReport.content_snapshot?.author_name || 
                         selectedReport.content_snapshot?.user_name ||
+                        selectedReport.content_snapshot?.uploaded_by_name ||
+                        selectedReport.content_snapshot?.uploader_name ||
                         selectedReport.reporter_name;
 
         if (userEmail && adminUser) {
@@ -1726,14 +1730,33 @@ const AdminDashboard = () => {
                             <span className="font-semibold">Content Type:</span> {selectedReport.content_snapshot.content_type}
                           </div>
                         )}
-                        {selectedReport.content_snapshot.author_name && (
+                        {/* Display author/uploader info - handle different naming conventions */}
+                        {(selectedReport.content_snapshot.author_name || 
+                          selectedReport.content_snapshot.uploaded_by_name || 
+                          selectedReport.content_snapshot.uploader_name) && (
                           <div>
-                            <span className="font-semibold">Author:</span> {selectedReport.content_snapshot.author_name}
+                            <span className="font-semibold">
+                              {selectedReport.content_type === 'question_paper' || selectedReport.content_type === 'student_note' 
+                                ? 'Uploader:' : 'Author:'}
+                            </span> {
+                              selectedReport.content_snapshot.author_name || 
+                              selectedReport.content_snapshot.uploaded_by_name || 
+                              selectedReport.content_snapshot.uploader_name
+                            }
                           </div>
                         )}
-                        {selectedReport.content_snapshot.author_email && (
+                        {(selectedReport.content_snapshot.author_email || 
+                          selectedReport.content_snapshot.uploaded_by_email || 
+                          selectedReport.content_snapshot.uploader_email) && (
                           <div>
-                            <span className="font-semibold">Author Email:</span> {selectedReport.content_snapshot.author_email}
+                            <span className="font-semibold">
+                              {selectedReport.content_type === 'question_paper' || selectedReport.content_type === 'student_note' 
+                                ? 'Uploader Email:' : 'Author Email:'}
+                            </span> {
+                              selectedReport.content_snapshot.author_email || 
+                              selectedReport.content_snapshot.uploaded_by_email || 
+                              selectedReport.content_snapshot.uploader_email
+                            }
                           </div>
                         )}
                         {selectedReport.content_snapshot.faculty_initial && (
@@ -1768,6 +1791,86 @@ const AdminDashboard = () => {
                               Download File
                             </a>
                           </div>
+                        )}
+                        
+                        {/* Question Paper specific fields */}
+                        {selectedReport.content_type === 'question_paper' && (
+                          <>
+                            {selectedReport.content_snapshot.year && (
+                              <div>
+                                <span className="font-semibold">Year:</span> {selectedReport.content_snapshot.year}
+                              </div>
+                            )}
+                            {selectedReport.content_snapshot.semester && (
+                              <div>
+                                <span className="font-semibold">Semester:</span> {selectedReport.content_snapshot.semester}
+                              </div>
+                            )}
+                            {selectedReport.content_snapshot.exam_type && (
+                              <div>
+                                <span className="font-semibold">Exam Type:</span> {selectedReport.content_snapshot.exam_type}
+                              </div>
+                            )}
+                            {selectedReport.content_snapshot.uploaded_at && (
+                              <div>
+                                <span className="font-semibold">Uploaded:</span> {new Date(selectedReport.content_snapshot.uploaded_at).toLocaleDateString()}
+                              </div>
+                            )}
+                          </>
+                        )}
+                        
+                        {/* Student Note specific fields */}
+                        {selectedReport.content_type === 'student_note' && (
+                          <>
+                            {selectedReport.content_snapshot.category && (
+                              <div>
+                                <span className="font-semibold">Category:</span> {selectedReport.content_snapshot.category}
+                              </div>
+                            )}
+                            {selectedReport.content_snapshot.upload_type && (
+                              <div>
+                                <span className="font-semibold">Upload Type:</span> {
+                                  selectedReport.content_snapshot.upload_type === 'file' ? 'File Upload' : 'Shared Link'
+                                }
+                              </div>
+                            )}
+                            {selectedReport.content_snapshot.link_url && (
+                              <div>
+                                <span className="font-semibold">Shared Link:</span> 
+                                <a 
+                                  href={selectedReport.content_snapshot.link_url} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="ml-2 text-blue-600 hover:text-blue-800 underline"
+                                >
+                                  Visit Link
+                                </a>
+                              </div>
+                            )}
+                            {selectedReport.content_snapshot.link_type && (
+                              <div>
+                                <span className="font-semibold">Link Type:</span> {
+                                  selectedReport.content_snapshot.link_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
+                                }
+                              </div>
+                            )}
+                            {selectedReport.content_snapshot.file_size && (
+                              <div>
+                                <span className="font-semibold">File Size:</span> {(selectedReport.content_snapshot.file_size / (1024 * 1024)).toFixed(1)} MB
+                              </div>
+                            )}
+                            {selectedReport.content_snapshot.created_at && (
+                              <div>
+                                <span className="font-semibold">Created:</span> {new Date(selectedReport.content_snapshot.created_at).toLocaleDateString()}
+                              </div>
+                            )}
+                            {selectedReport.content_snapshot.description && (
+                              <div className="col-span-2">
+                                <span className="font-semibold">Description:</span>
+                                <p className="mt-1 text-muted-foreground">{selectedReport.content_snapshot.description}</p>
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
 

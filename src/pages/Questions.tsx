@@ -364,8 +364,13 @@ const Questions = () => {
         content_snapshot: {
           title: paperToReport.title,
           course_code: paperToReport.course_code,
+          year: paperToReport.year,
+          semester: paperToReport.semester,
+          exam_type: paperToReport.exam_type,
           file_name: paperToReport.file_name,
-          uploaded_by: paperToReport.uploaded_by_name,
+          uploaded_by_name: paperToReport.uploaded_by_name,
+          uploaded_by_email: paperToReport.uploaded_by_email,
+          uploaded_at: paperToReport.uploaded_at,
           file_url: paperToReport.file_url
         }
       });

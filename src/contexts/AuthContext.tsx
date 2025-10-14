@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { toast } from 'sonner';
 import AdminService from '@/lib/adminService';
+import { supabase } from '@/lib/supabaseClient';
 
 // Define types for Google credential response
 interface CredentialResponse {
@@ -101,6 +102,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkAndLoadUser();
   }, []);
 
+  const signInWithSupabase = async (userData: GoogleUser, idToken: string) => {
+    try {
+      console.log('🔐 Syncing Google Auth with Supabase...');
+      
+      // Use Google ID token to sign in to Supabase
+      const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: 'google',
+        token: idToken,
+      });
+
+      if (error) {
+        console.error('❌ Supabase auth error:', error);
+        // Continue with local auth even if Supabase fails
+        toast.warning('Note: Some features may require re-authentication');
+      } else {
+        console.log('✅ Supabase authentication successful');
+      }
+
+      return !error;
+    } catch (error) {
+      console.error('❌ Error syncing with Supabase:', error);
+      return false;
+    }
+  };
+
   const handleCredentialResponse = async (response: CredentialResponse) => {
     const userData = decodeJWT(response.credential);
     
@@ -128,6 +154,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.warn('Could not check ban status, allowing login:', error);
       }
       
+      // Sync with Supabase for file upload capabilities
+      await signInWithSupabase(userData, response.credential);
+      
       setUser(userData);
       localStorage.setItem('bracu-loop-user', JSON.stringify(userData));
       toast.success(`Welcome back, ${userData.name.split(' ')[0]}!`);
@@ -137,7 +166,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signOut = () => {
+  const signOut = async () => {
+    // Sign out from Supabase as well
+    try {
+      await supabase.auth.signOut();
+      console.log('✅ Signed out from Supabase');
+    } catch (error) {
+      console.warn('⚠️ Error signing out from Supabase:', error);
+    }
+    
     setUser(null);
     localStorage.removeItem('bracu-loop-user');
     if (window.google) {
