@@ -38,7 +38,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { NotesService, StudentNote, NoteUploadData } from '@/lib/notesService';
+import NotesService, { StudentNote, NoteUploadData } from '@/lib/notesService';
 import AdminService from '@/lib/adminService';
 
 export default function Notes() {
@@ -70,9 +70,9 @@ export default function Notes() {
   const [reportDescription, setReportDescription] = useState('');
 
   const courses = [
-    'CSE110', 'CSE111', 'CSE220', 'CSE221', 'CSE230', 'CSE250', 'CSE260',
-    'CSE330', 'CSE340', 'CSE350', 'CSE370', 'CSE420', 'CSE421', 'CSE422',
-    'CSE423', 'CSE470', 'CSE471', 'CSE490', 'MAT110', 'MAT120', 'MAT215',
+    'CSE110', 'CSE111', 'CSE220', 'CSE221', 'CSE230', 'CSE250', 'CSE251', 'CSE260',
+    'CSE330', 'CSE331', 'CSE340', 'CSE341', 'CSE350', 'CSE360','CSE370', 'CSE420', 'CSE421', 'CSE422',
+    'CSE423','CSE425','CSE428','CSE437', 'CSE470', 'CSE471', 'CSE490', 'MAT110', 'MAT120', 'MAT215',
     'MAT216', 'PHY111', 'PHY112', 'ENG101', 'ENG102', 'BUS101', 'ECO101'
   ];
 
@@ -501,15 +501,16 @@ export default function Notes() {
 
       {/* Upload Dialog */}
       <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="max-w-[95vw] sm:max-w-[600px] max-h-[95vh] overflow-hidden flex flex-col touch-pan-y">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>Upload Note</DialogTitle>
             <DialogDescription>
               Upload ZIP files or share links to Google Drive, OneDrive, or Dropbox
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
+          <div className="flex-1 overflow-y-auto px-1">
+            <div className="space-y-4 py-4">
             {/* Upload Type Selection */}
             <div>
               <Label className="text-sm font-medium mb-3 block">How do you want to share?</Label>
@@ -648,8 +649,9 @@ export default function Notes() {
               />
             </div>
           </div>
+        </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-shrink-0">
             <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>
               Cancel
             </Button>
