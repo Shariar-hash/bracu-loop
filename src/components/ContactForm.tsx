@@ -15,7 +15,6 @@ import { toast } from 'sonner';
 import { Mail, Send, MessageSquare, AlertCircle, User } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import SecureAdminService from '@/lib/secureAdminService';
-import { TestContactService } from '@/lib/testContactService';
 
 interface ContactFormData {
   student_name: string;

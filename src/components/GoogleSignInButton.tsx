@@ -14,7 +14,7 @@ export function GoogleSignInButton() {
   const { user, signOut, isLoading, handleCredentialResponse } = useAuth();
   const buttonRef = useRef<HTMLDivElement>(null);
 
-  // Initialize Google Sign-in button for desktop
+  // Initialize Google Sign-in button with better mobile support
   useEffect(() => {
     if (window.google && buttonRef.current && !user) {
       // Clear any existing content
@@ -31,18 +31,46 @@ export function GoogleSignInButton() {
           hd: 'g.bracu.ac.bd', // Only show BRACU emails
         });
 
+        // Responsive button sizing
+        const isMobile = window.innerWidth < 768;
         window.google.accounts.id.renderButton(buttonRef.current, {
           theme: "outline",
-          size: "large",
+          size: isMobile ? "medium" : "large",
           type: "standard",
-          text: "signin_with",
-          width: 200,
-          locale: "en", // Force English locale
+          text: isMobile ? "signin" : "signin_with",
+          width: isMobile ? 150 : 200,
+          locale: "en",
         });
+        
+        // Hide fallback button since Google button loaded
+        const fallback = buttonRef.current?.parentElement?.querySelector('.google-signin-fallback') as HTMLElement;
+        if (fallback) {
+          fallback.style.display = 'none';
+        }
       } catch (error) {
-        // Silently handle error
+        console.warn('Google Sign-In button error:', error);
+        // Show fallback button if Google button fails
+        const fallback = buttonRef.current?.parentElement?.querySelector('.google-signin-fallback') as HTMLElement;
+        if (fallback) {
+          fallback.style.display = 'inline-flex';
+        }
       }
     }
+    
+    // Show fallback after timeout if Google button doesn't load
+    const timeout = setTimeout(() => {
+      if (buttonRef.current && !user) {
+        const hasGoogleButton = buttonRef.current.querySelector('iframe');
+        if (!hasGoogleButton) {
+          const fallback = buttonRef.current?.parentElement?.querySelector('.google-signin-fallback') as HTMLElement;
+          if (fallback) {
+            fallback.style.display = 'inline-flex';
+          }
+        }
+      }
+    }, 2000);
+    
+    return () => clearTimeout(timeout);
   }, [user, handleCredentialResponse]);
 
   const handleMobileSignIn = () => {
@@ -114,17 +142,28 @@ export function GoogleSignInButton() {
 
   return (
     <>
-      {/* Desktop Google Sign-in Button */}
-      <div className="hidden sm:block google-signin-container" ref={buttonRef}></div>
+      {/* Desktop Google Sign-in Button with Fallback */}
+      <div className="hidden sm:flex items-center gap-2">
+        <div className="google-signin-container" ref={buttonRef}></div>
+        {/* Fallback button if Google doesn't load */}
+        <Button 
+          variant="outline" 
+          onClick={handleMobileSignIn}
+          className="google-signin-fallback"
+          style={{ display: 'none' }}
+        >
+          Sign in with Google
+        </Button>
+      </div>
       
       {/* Mobile Sign-in Button */}
       <Button 
         variant="ghost" 
-        size="icon"
-        className="sm:hidden"
+        size="sm"
+        className="sm:hidden text-xs px-2"
         onClick={handleMobileSignIn}
       >
-        <User className="h-5 w-5" />
+        Sign in
       </Button>
     </>
   );
