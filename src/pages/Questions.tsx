@@ -137,7 +137,7 @@ const Questions = () => {
 
         if (error) {
           console.warn('Failed to load courses from database, using fallback:', error);
-          // Fallback to sample courses if database fails
+          // Fallback to complete BRACU CSE courses if database fails
           coursesToUse = [
             { id: '1', course_code: 'CSE101', course_name: 'Introduction to Computer Science', category_id: '1' },
             { id: '2', course_code: 'CSE110', course_name: 'Programming Language I', category_id: '1' },
@@ -186,7 +186,7 @@ const Questions = () => {
             { id: '45', course_code: 'CSE472', course_name: 'Human-Computer Interface', category_id: '1' },
             { id: '46', course_code: 'CSE473', course_name: 'Financial Engineering & Technology', category_id: '1' },
             { id: '47', course_code: 'CSE474', course_name: 'Simulation and Modeling', category_id: '1' },
-            { id: '48', course_code: 'CSE490', course_name: 'Special Topics', category_id: '1' },
+            { id: '48', course_code: 'CSE490', course_name: 'WAN Routing and Technologies', category_id: '1' },
             { id: '49', course_code: 'CSE491', course_name: 'Independent Study', category_id: '1' }
           ];
         } else {
@@ -364,13 +364,8 @@ const Questions = () => {
         content_snapshot: {
           title: paperToReport.title,
           course_code: paperToReport.course_code,
-          year: paperToReport.year,
-          semester: paperToReport.semester,
-          exam_type: paperToReport.exam_type,
           file_name: paperToReport.file_name,
-          uploaded_by_name: paperToReport.uploaded_by_name,
-          uploaded_by_email: paperToReport.uploaded_by_email,
-          uploaded_at: paperToReport.uploaded_at,
+          uploaded_by: paperToReport.uploaded_by_name,
           file_url: paperToReport.file_url
         }
       });
