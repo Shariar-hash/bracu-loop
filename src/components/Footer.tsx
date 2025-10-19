@@ -12,7 +12,7 @@ export const Footer = () => {
               © {currentYear} BRACU Loop. All rights reserved.
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              Created by Shariar Rahman • BRAC University Student Platform
+              Created by Montasir Shariar • BRAC University Student Platform
             </p>
           </div>
           <div className="flex gap-6">

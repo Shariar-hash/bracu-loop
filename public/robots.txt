@@ -1,5 +1,5 @@
 # BRACU Loop - BRAC University Student Platform
-# Created by Shariar Rahman - https://alriar.me/
+# Created by Montasir Shariar - https://alriar.me/
 
 User-agent: *
 Allow: /
