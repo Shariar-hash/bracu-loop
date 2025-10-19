@@ -12,17 +12,7 @@ export const Footer = () => {
               © {currentYear} BRACU Loop. All rights reserved.
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              Created by{" "}
-              <a 
-                href="https://alriar.me/" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-primary hover:text-primary/80 transition-colors font-medium"
-                title="Visit Shariar Rahman's Portfolio"
-              >
-                Shariar Rahman
-              </a>
-              {" "}• BRAC University Student Platform
+              Created by Shariar Rahman • BRAC University Student Platform
             </p>
           </div>
           <div className="flex gap-6">
@@ -45,15 +35,7 @@ export const Footer = () => {
             >
               Contact
             </Link>
-            <a
-              href="https://alriar.me/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              title="Developer Portfolio"
-            >
-              Portfolio
-            </a>
+
             <Link
               to="/admin"
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
