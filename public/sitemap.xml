@@ -6,7 +6,7 @@
   <!-- Homepage -->
   <url>
     <loc>https://bracu-loop.vercel.app/</loc>
-    <lastmod>2025-10-19</lastmod>
+    <lastmod>2025-10-19T12:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
@@ -14,7 +14,7 @@
   <!-- Faculty Reviews -->
   <url>
     <loc>https://bracu-loop.vercel.app/review</loc>
-    <lastmod>2025-10-19</lastmod>
+    <lastmod>2025-10-19T12:00:00+00:00</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
@@ -22,7 +22,7 @@
   <!-- Notes Sharing -->
   <url>
     <loc>https://bracu-loop.vercel.app/notes</loc>
-    <lastmod>2025-10-19</lastmod>
+    <lastmod>2025-10-19T12:00:00+00:00</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
@@ -30,7 +30,7 @@
   <!-- Question Papers -->
   <url>
     <loc>https://bracu-loop.vercel.app/questions</loc>
-    <lastmod>2025-10-19</lastmod>
+    <lastmod>2025-10-19T12:00:00+00:00</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
@@ -38,7 +38,7 @@
   <!-- Room Finder -->
   <url>
     <loc>https://bracu-loop.vercel.app/roomfinder</loc>
-    <lastmod>2025-10-19</lastmod>
+    <lastmod>2025-10-19T12:00:00+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -46,7 +46,7 @@
   <!-- Suggestions -->
   <url>
     <loc>https://bracu-loop.vercel.app/suggestions</loc>
-    <lastmod>2025-10-19</lastmod>
+    <lastmod>2025-10-19T12:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>
@@ -54,7 +54,7 @@
   <!-- Contact -->
   <url>
     <loc>https://bracu-loop.vercel.app/contact</loc>
-    <lastmod>2025-10-19</lastmod>
+    <lastmod>2025-10-19T12:00:00+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
@@ -62,7 +62,7 @@
   <!-- Creator Portfolio Link -->
   <url>
     <loc>https://alriar.me/</loc>
-    <lastmod>2025-10-19</lastmod>
+    <lastmod>2025-10-19T12:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
