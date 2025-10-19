@@ -299,7 +299,7 @@ const ContactForm = () => {
           <h4 className="font-medium text-gray-900 mb-2">Alternative Contact Methods:</h4>
           <div className="text-sm text-gray-600 space-y-1">
             <p>• Admin 1: montasirshariar123@gmail.com</p>
-            <p>• Admin 2: fahimsifat12345@gmail.com</p>
+            <p>• Admin 2: sifatullah.fahim@g.bracu.ac.bd</p>
             <p className="text-xs italic mt-2 text-blue-600">* For urgent matters, contact both admins directly</p>
           </div>
         </CardContent>

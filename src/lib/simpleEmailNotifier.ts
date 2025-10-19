@@ -6,7 +6,7 @@ class SimpleEmailNotifier {
   // Admin email addresses
   private static readonly ADMIN_EMAILS = [
     'montasirshariar@gmail.com',
-    'fahimsifat12345@gmail.com'
+    'sifatullah.fahim@g.bracu.ac.bd'
   ];
 
   /**

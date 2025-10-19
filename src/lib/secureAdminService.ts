@@ -340,7 +340,7 @@ class SecureAdminService {
     ];
 
     const emailPayload = {
-      to: ['montasirshariar@gmail.com', 'fahimsifat12345@gmail.com'],
+      to: ['montasirshariar123@gmail.com', 'sifatullah.fahim@g.bracu.ac.bd'],
       subject: `[BRACU Loop] New Contact: ${contactData.subject}`,
       html: this.generateEmailHTML(contactData),
       text: this.generateEmailText(contactData),
@@ -464,7 +464,7 @@ This is an automated notification from BRACU Loop.
     
     // Try to open a mailto link as last resort
     try {
-      const mailtoLink = `mailto:montasirshariar@gmail.com,fahimsifat12345@gmail.com?subject=${encodeURIComponent(`[BRACU Loop] New Contact: ${contactData.subject}`)}&body=${encodeURIComponent(this.generateEmailText(contactData))}`;
+      const mailtoLink = `mailto:montasirshariar@gmail.com,sifatullah.fahim@g.bracu.ac.bd?subject=${encodeURIComponent(`[BRACU Loop] New Contact: ${contactData.subject}`)}&body=${encodeURIComponent(this.generateEmailText(contactData))}`;
       
       const link = document.createElement('a');
       link.href = mailtoLink;
