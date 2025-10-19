@@ -24,18 +24,9 @@ export interface StudentNote {
   uploader_email: string;
   uploader_student_id?: string;
   
-  // Engagement metrics
-  download_count: number;
-  rating_sum: number;
-  rating_count: number;
-  average_rating?: number;
-  
-  // Moderation
+  // Metadata
   is_approved: boolean;
-  is_reported: boolean;
-  report_count: number;
-  
-  // Timestamps
+  download_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -56,49 +47,36 @@ export interface LinkData extends NoteUploadData {
   link_type: 'google_drive' | 'onedrive' | 'dropbox' | 'other';
 }
 
-class NotesService {
+export class NotesService {
   /**
-   * Upload a file to Supabase Storage and save metadata
+   * Upload a file and save metadata to database
    */
   static async uploadFile(file: File, noteData: NoteUploadData): Promise<{ success: boolean; error?: string; data?: any }> {
     try {
-      // Check file size (max 18MB)
-      const maxSize = 18 * 1024 * 1024;
+      console.log('🔄 Starting file upload process...');
+      
+      // Validate file size (18MB limit)
+      const maxSize = 18 * 1024 * 1024; // 18MB in bytes
       if (file.size > maxSize) {
-        return { success: false, error: 'File size must be less than 18MB' };
+        return { success: false, error: 'File size must be under 18MB' };
       }
       
-      // Check file type (ZIP files only)
-      const allowedTypes = [
-        'application/zip',
-        'application/x-zip-compressed',
-        'application/x-rar-compressed',
-        'application/x-7z-compressed'
-      ];
-      
-      if (!allowedTypes.includes(file.type) && !file.name.endsWith('.zip') && !file.name.endsWith('.rar')) {
-        return { success: false, error: 'Please upload ZIP or RAR files only' };
+      // Validate file type (only ZIP, RAR, 7Z)
+      const allowedTypes = ['.zip', '.rar', '.7z'];
+      const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+      if (!allowedTypes.includes(fileExtension)) {
+        return { success: false, error: 'Only ZIP, RAR, and 7Z files are allowed' };
       }
       
-      console.log(`📤 Uploading ${file.name} to Supabase Storage...`);
-      
-      // DEBUG: Check authentication
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      console.log('🔐 Current user:', user?.email || 'NOT AUTHENTICATED');
-      console.log('📦 File size:', Math.round(file.size / 1024 / 1024 * 100) / 100, 'MB');
-      
-      if (!user) {
-        return { success: false, error: 'You must be signed in to upload files' };
-      }
-      
-      // Generate unique filename
+      // Create file path with user email prefix
       const timestamp = Date.now();
-      const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const fileName = `${timestamp}_${sanitizedName}`;
-      const filePath = `${noteData.course_code}/${fileName}`;
+      const fileName = `${timestamp}-${file.name}`;
+      const filePath = `${noteData.uploader_email}/${fileName}`;
       
-      // Upload to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      console.log('📁 Uploading to path:', filePath);
+      
+      // Upload file to Supabase Storage
+      const { error: uploadError } = await supabase.storage
         .from('student-notes')
         .upload(filePath, file, {
           cacheControl: '3600',
@@ -110,7 +88,7 @@ class NotesService {
         return { success: false, error: uploadError.message };
       }
       
-      console.log('✅ File uploaded to Supabase:', filePath);
+      console.log('✅ File uploaded successfully');
       
       // Save metadata to database
       const { data, error } = await supabase
@@ -130,37 +108,33 @@ class NotesService {
           uploader_email: noteData.uploader_email,
           uploader_student_id: noteData.uploader_student_id,
           is_approved: true,
-          download_count: 0,
-          rating_sum: 0,
-          rating_count: 0,
-          report_count: 0,
-          is_reported: false
+          download_count: 0
         }])
         .select()
         .single();
       
       if (error) {
-        // Cleanup uploaded file if database insert fails
-        await supabase.storage.from('student-notes').remove([filePath]);
         console.error('❌ Database error:', error);
-        return { success: false, error: 'Failed to save note information' };
+        // Clean up uploaded file if database insert fails
+        await supabase.storage.from('student-notes').remove([filePath]);
+        return { success: false, error: error.message };
       }
       
-      console.log('✅ Note saved to database:', data.id);
+      console.log('✅ File upload completed successfully');
       return { success: true, data };
       
     } catch (error: any) {
-      console.error('Upload error:', error);
-      return { success: false, error: error.message || 'Upload failed' };
+      console.error('❌ Upload process failed:', error);
+      return { success: false, error: error.message };
     }
   }
 
   /**
-   * Save a link (Google Drive, OneDrive, etc.)
+   * Save a shared link
    */
-  static async saveLink(linkData: LinkData): Promise<{ success: boolean; error?: string; data?: any }> {
+  static async saveLink(linkData: LinkData): Promise<{ success: boolean; error?: string; data?: any; type: string }> {
     try {
-      console.log('🔗 Saving link:', linkData.link_url);
+      console.log('🔗 Saving shared link...');
       
       // Save link to database
       const { data, error } = await supabase
@@ -178,26 +152,22 @@ class NotesService {
           uploader_email: linkData.uploader_email,
           uploader_student_id: linkData.uploader_student_id,
           is_approved: true,
-          download_count: 0,
-          rating_sum: 0,
-          rating_count: 0,
-          report_count: 0,
-          is_reported: false
+          download_count: 0
         }])
         .select()
         .single();
       
       if (error) {
-        console.error('❌ Database error:', error);
-        return { success: false, error: 'Failed to save link' };
+        console.error('❌ Link save error:', error);
+        return { success: false, error: error.message, type: 'link' };
       }
       
-      console.log('✅ Link saved to database:', data.id);
-      return { success: true, data };
+      console.log('✅ Link saved successfully');
+      return { success: true, data, type: 'link' };
       
     } catch (error: any) {
-      console.error('Save link error:', error);
-      return { success: false, error: error.message || 'Failed to save link' };
+      console.error('❌ Link save failed:', error);
+      return { success: false, error: error.message, type: 'link' };
     }
   }
 
@@ -248,59 +218,67 @@ class NotesService {
         notes: data || [],
         total: count || 0
       };
+      
     } catch (error) {
-      console.error('Error fetching notes:', error);
-      return { notes: [], total: 0 };
+      console.error('Error loading notes:', error);
+      throw error;
     }
   }
 
   /**
    * Access a note (download file or open link)
    */
-  static async accessNote(noteId: string): Promise<{ success: boolean; error?: string; type: 'file' | 'link'; url?: string }> {
+  static async accessNote(noteId: string): Promise<{ success: boolean; url?: string; error?: string; type?: string }> {
     try {
       // Get note details
-      const { data: note, error } = await supabase
+      const { data: note, error: noteError } = await supabase
         .from('student_notes')
         .select('*')
         .eq('id', noteId)
         .single();
       
-      if (error || !note) {
-        return { success: false, error: 'Note not found', type: 'file' };
+      if (noteError || !note) {
+        return { success: false, error: 'Note not found' };
       }
       
       if (note.upload_type === 'link') {
-        // For links, just return the URL
-        return {
-          success: true,
-          type: 'link',
-          url: note.link_url
+        // Return the external link
+        return { 
+          success: true, 
+          url: note.link_url, 
+          type: 'link' 
         };
       } else {
-        // For files, get download URL from Supabase Storage
-        const { data: urlData } = await supabase.storage
+        // Generate download URL for file
+        const { data, error } = await supabase.storage
           .from('student-notes')
           .createSignedUrl(note.file_path, 3600); // 1 hour expiry
         
-        if (urlData) {
-          return {
-            success: true,
-            type: 'file',
-            url: urlData.signedUrl
-          };
-        } else {
-          return { success: false, error: 'Could not generate download link', type: 'file' };
+        if (error) {
+          return { success: false, error: error.message };
         }
+        
+        // Increment download count
+        await supabase
+          .from('student_notes')
+          .update({ download_count: (note.download_count || 0) + 1 })
+          .eq('id', noteId);
+        
+        return { 
+          success: true, 
+          url: data.signedUrl, 
+          type: 'file' 
+        };
       }
+      
     } catch (error: any) {
-      console.error('Access error:', error);
-      return { success: false, error: error.message, type: 'file' };
+      console.error('Access note error:', error);
+      return { success: false, error: error.message };
     }
   }
 
   /**
-   * Delete a note
+   * Delete a note (only by owner)
    */
   static async deleteNote(noteId: string, userEmail: string): Promise<boolean> {
     try {
@@ -320,8 +298,6 @@ class NotesService {
         throw new Error('You can only delete your own notes');
       }
       
-      console.log(`🗑️ Deleting note: ${note.title}`);
-      
       // Delete file from storage if it's a file upload
       if (note.upload_type === 'file' && note.file_path) {
         await supabase.storage
@@ -340,31 +316,10 @@ class NotesService {
       }
       
       return true;
+      
     } catch (error: any) {
-      console.error('Error in deleteNote:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Get user's notes
-   */
-  static async getUserNotes(userEmail: string): Promise<StudentNote[]> {
-    try {
-      const { data, error } = await supabase
-        .from('student_notes')
-        .select('*')
-        .eq('uploader_email', userEmail)
-        .order('created_at', { ascending: false });
-      
-      if (error) {
-        throw error;
-      }
-      
-      return data || [];
-    } catch (error) {
-      console.error('Error fetching user notes:', error);
-      return [];
+      console.error('Delete note error:', error);
+      throw error;
     }
   }
 }

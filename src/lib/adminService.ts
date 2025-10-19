@@ -403,53 +403,6 @@ class AdminService {
           deleteError = new Error('Question not found');
           deleted = false;
         }
-        
-      } else if (contentType === 'student_note') {
-        // Get student note details first
-        console.log(`📝 Deleting student note with ID: ${contentId}`);
-        
-        const { data: note } = await supabase
-          .from('student_notes')
-          .select('upload_type, file_path, link_url, title, uploader_email')
-          .eq('id', contentId)
-          .single();
-        
-        if (note) {
-          console.log(`📋 Found note: ${note.title} (${note.upload_type})`);
-          
-          // If it's a file upload, delete from storage first
-          if (note.upload_type === 'file' && note.file_path) {
-            console.log(`🗑️ Deleting file from storage: ${note.file_path}`);
-            
-            const { error: storageError } = await supabase.storage
-              .from('student-notes')
-              .remove([note.file_path]);
-            
-            if (storageError) {
-              console.warn('⚠️ Storage delete warning:', storageError.message);
-            } else {
-              console.log('✅ File deleted from storage');
-            }
-          }
-          
-          // Then delete from database
-          const { error } = await supabase
-            .from('student_notes')
-            .delete()
-            .eq('id', contentId);
-            
-          deleteError = error;
-          deleted = !error;
-          
-          if (deleted) {
-            console.log('✅ Successfully deleted student note from database');
-          } else {
-            console.error('❌ Failed to delete student note from database:', error);
-          }
-        } else {
-          deleteError = new Error('Student note not found');
-          deleted = false;
-        }
       }
 
       if (deleteError) {

@@ -270,31 +270,7 @@ const ContactForm = () => {
               </div>
             </div>
 
-            {/* Debug section - remove in production */}
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <div className="text-sm text-yellow-800">
-                <p className="font-medium mb-2">🔧 Debug Tools:</p>
-                <button 
-                  type="button"
-                  onClick={() => {
-                    // Load and run database test
-                    const script = document.createElement('script');
-                    script.src = '/test-db.js';
-                    script.onload = () => {
-                      // @ts-ignore
-                      window.testDB();
-                    };
-                    document.head.appendChild(script);
-                  }}
-                  className="px-3 py-1 bg-yellow-200 text-yellow-800 rounded text-xs hover:bg-yellow-300"
-                >
-                  Test Database Connection
-                </button>
-                <p className="text-xs mt-2 text-yellow-600">
-                  Click to test database connection and permissions. Check browser console for results.
-                </p>
-              </div>
-            </div>
+
 
             <Button 
               type="submit" 
@@ -322,10 +298,9 @@ const ContactForm = () => {
         <CardContent className="p-4">
           <h4 className="font-medium text-gray-900 mb-2">Alternative Contact Methods:</h4>
           <div className="text-sm text-gray-600 space-y-1">
-            <p>• Primary: admin@gmail.com</p>
-            <p>• Support: your-email@company.com</p>
-            <p>• Help Desk: team@yourdomain.com</p>
-            <p className="text-xs italic mt-2 text-blue-600">* Admin emails can use any domain (Gmail, Yahoo, Outlook, etc.)</p>
+            <p>• Admin 1: montasirshariar123@gmail.com</p>
+            <p>• Admin 2: fahimsifat12345@gmail.com</p>
+            <p className="text-xs italic mt-2 text-blue-600">* For urgent matters, contact both admins directly</p>
           </div>
         </CardContent>
       </Card>

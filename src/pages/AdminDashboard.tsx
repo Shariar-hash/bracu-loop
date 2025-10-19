@@ -27,7 +27,6 @@ import SecureAdminService, {
   type ReportedContent,
   type ContactSubmission
 } from "@/lib/secureAdminService";
-import { testDatabaseConnection } from "@/lib/testDatabase";
 import {
   Shield,
   Users,
@@ -216,17 +215,7 @@ const AdminDashboard = () => {
     try {
       console.log('🔍 AdminDashboard.loadFaculty - Starting...');
       
-      // Test database connection first
-      const dbTest = await testDatabaseConnection();
-      console.log('🔍 Database test result:', dbTest);
-      
-      if (!dbTest.success) {
-        console.error('❌ Database connection test failed:', dbTest.error);
-        toast.error(`Database connection failed: ${dbTest.error?.message || 'Unknown error'}`);
-        return;
-      }
-      
-      console.log('✅ Database connection test passed, fetching faculty...');
+      console.log('✅ Fetching faculty...');
       const faculty = await AdminService.getFaculty();
       console.log('✅ Faculty loaded successfully:', faculty?.length || 0, 'records');
       setFaculty(faculty);
@@ -340,13 +329,9 @@ const AdminDashboard = () => {
         // Extract user info from the report content snapshot
         const userEmail = selectedReport.content_snapshot?.author_email || 
                          selectedReport.content_snapshot?.user_email ||
-                         selectedReport.content_snapshot?.uploaded_by_email ||
-                         selectedReport.content_snapshot?.uploader_email ||
                          selectedReport.reporter_email;
         const userName = selectedReport.content_snapshot?.author_name || 
                         selectedReport.content_snapshot?.user_name ||
-                        selectedReport.content_snapshot?.uploaded_by_name ||
-                        selectedReport.content_snapshot?.uploader_name ||
                         selectedReport.reporter_name;
 
         if (userEmail && adminUser) {
@@ -841,45 +826,6 @@ const AdminDashboard = () => {
             <TabsContent value="dashboard" className="space-y-6">
               <div>
                 <h2 className="text-2xl font-bold mb-6">Dashboard Overview</h2>
-                
-                {/* Debug Section */}
-                <Card className="mb-6 border-orange-200">
-                  <CardHeader>
-                    <CardTitle className="text-orange-600">🔧 Debug Tools</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={async () => {
-                          const result = await testDatabaseConnection();
-                          console.log('Manual DB test result:', result);
-                          if (result.success) {
-                            toast.success(`Database OK - Faculties: ${result.facultiesCount}, Courses: ${result.coursesCount}`);
-                          } else {
-                            toast.error(`Database Error: ${result.error?.message}`);
-                          }
-                        }}
-                      >
-                        Test Database Connection
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => {
-                          loadFaculty();
-                          toast.info('Retrying faculty load...');
-                        }}
-                      >
-                        Retry Load Faculty
-                      </Button>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Current Status: {faculty.length} faculties, {courses.length} courses loaded
-                    </p>
-                  </CardContent>
-                </Card>
                 
                 {/* Stats Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -1730,33 +1676,14 @@ const AdminDashboard = () => {
                             <span className="font-semibold">Content Type:</span> {selectedReport.content_snapshot.content_type}
                           </div>
                         )}
-                        {/* Display author/uploader info - handle different naming conventions */}
-                        {(selectedReport.content_snapshot.author_name || 
-                          selectedReport.content_snapshot.uploaded_by_name || 
-                          selectedReport.content_snapshot.uploader_name) && (
+                        {selectedReport.content_snapshot.author_name && (
                           <div>
-                            <span className="font-semibold">
-                              {selectedReport.content_type === 'question_paper' || selectedReport.content_type === 'student_note' 
-                                ? 'Uploader:' : 'Author:'}
-                            </span> {
-                              selectedReport.content_snapshot.author_name || 
-                              selectedReport.content_snapshot.uploaded_by_name || 
-                              selectedReport.content_snapshot.uploader_name
-                            }
+                            <span className="font-semibold">Author:</span> {selectedReport.content_snapshot.author_name}
                           </div>
                         )}
-                        {(selectedReport.content_snapshot.author_email || 
-                          selectedReport.content_snapshot.uploaded_by_email || 
-                          selectedReport.content_snapshot.uploader_email) && (
+                        {selectedReport.content_snapshot.author_email && (
                           <div>
-                            <span className="font-semibold">
-                              {selectedReport.content_type === 'question_paper' || selectedReport.content_type === 'student_note' 
-                                ? 'Uploader Email:' : 'Author Email:'}
-                            </span> {
-                              selectedReport.content_snapshot.author_email || 
-                              selectedReport.content_snapshot.uploaded_by_email || 
-                              selectedReport.content_snapshot.uploader_email
-                            }
+                            <span className="font-semibold">Author Email:</span> {selectedReport.content_snapshot.author_email}
                           </div>
                         )}
                         {selectedReport.content_snapshot.faculty_initial && (
@@ -1791,86 +1718,6 @@ const AdminDashboard = () => {
                               Download File
                             </a>
                           </div>
-                        )}
-                        
-                        {/* Question Paper specific fields */}
-                        {selectedReport.content_type === 'question_paper' && (
-                          <>
-                            {selectedReport.content_snapshot.year && (
-                              <div>
-                                <span className="font-semibold">Year:</span> {selectedReport.content_snapshot.year}
-                              </div>
-                            )}
-                            {selectedReport.content_snapshot.semester && (
-                              <div>
-                                <span className="font-semibold">Semester:</span> {selectedReport.content_snapshot.semester}
-                              </div>
-                            )}
-                            {selectedReport.content_snapshot.exam_type && (
-                              <div>
-                                <span className="font-semibold">Exam Type:</span> {selectedReport.content_snapshot.exam_type}
-                              </div>
-                            )}
-                            {selectedReport.content_snapshot.uploaded_at && (
-                              <div>
-                                <span className="font-semibold">Uploaded:</span> {new Date(selectedReport.content_snapshot.uploaded_at).toLocaleDateString()}
-                              </div>
-                            )}
-                          </>
-                        )}
-                        
-                        {/* Student Note specific fields */}
-                        {selectedReport.content_type === 'student_note' && (
-                          <>
-                            {selectedReport.content_snapshot.category && (
-                              <div>
-                                <span className="font-semibold">Category:</span> {selectedReport.content_snapshot.category}
-                              </div>
-                            )}
-                            {selectedReport.content_snapshot.upload_type && (
-                              <div>
-                                <span className="font-semibold">Upload Type:</span> {
-                                  selectedReport.content_snapshot.upload_type === 'file' ? 'File Upload' : 'Shared Link'
-                                }
-                              </div>
-                            )}
-                            {selectedReport.content_snapshot.link_url && (
-                              <div>
-                                <span className="font-semibold">Shared Link:</span> 
-                                <a 
-                                  href={selectedReport.content_snapshot.link_url} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="ml-2 text-blue-600 hover:text-blue-800 underline"
-                                >
-                                  Visit Link
-                                </a>
-                              </div>
-                            )}
-                            {selectedReport.content_snapshot.link_type && (
-                              <div>
-                                <span className="font-semibold">Link Type:</span> {
-                                  selectedReport.content_snapshot.link_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
-                                }
-                              </div>
-                            )}
-                            {selectedReport.content_snapshot.file_size && (
-                              <div>
-                                <span className="font-semibold">File Size:</span> {(selectedReport.content_snapshot.file_size / (1024 * 1024)).toFixed(1)} MB
-                              </div>
-                            )}
-                            {selectedReport.content_snapshot.created_at && (
-                              <div>
-                                <span className="font-semibold">Created:</span> {new Date(selectedReport.content_snapshot.created_at).toLocaleDateString()}
-                              </div>
-                            )}
-                            {selectedReport.content_snapshot.description && (
-                              <div className="col-span-2">
-                                <span className="font-semibold">Description:</span>
-                                <p className="mt-1 text-muted-foreground">{selectedReport.content_snapshot.description}</p>
-                              </div>
-                            )}
-                          </>
                         )}
                       </div>
 
