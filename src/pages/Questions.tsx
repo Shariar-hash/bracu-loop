@@ -745,7 +745,7 @@ const Questions = () => {
                   <SelectValue placeholder="Select a reason..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="copyright">Copyright violation</SelectItem>
+                  
                   <SelectItem value="inappropriate">Inappropriate content</SelectItem>
                   <SelectItem value="wrong_course">Wrong course material</SelectItem>
                   <SelectItem value="poor_quality">Poor quality/unreadable</SelectItem>
