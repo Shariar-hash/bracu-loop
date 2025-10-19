@@ -5,6 +5,7 @@ import {
   MessageSquare, 
   MapPin 
 } from "lucide-react";
+import { Helmet } from 'react-helmet-async';
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { FeatureCard } from "@/components/FeatureCard";
@@ -60,6 +61,9 @@ const features = [
 const Index = () => {
   return (
     <div className="min-h-screen">
+      <Helmet>
+        <meta name="google-site-verification" content="bZ8hQ6Qk74nXxd10x1bmvC0-X4BHjUMZL87U68wSRm0" />
+      </Helmet>
       <Header />
       
       <main className="flex-1">
