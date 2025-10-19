@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { Header } from '../components/Header';
-import { Filter } from 'lucide-react';
+import { Search, ChevronDown } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -212,28 +212,62 @@ const FacultyReview: React.FC = () => {
         <h1 className="text-4xl font-bold text-slate-900 dark:text-white mb-2">Faculty Reviews</h1>
         <p className="text-slate-600 dark:text-slate-400 mb-8">Discover what students think about their professors</p>
       
-      <div className="search-bar flex gap-2 mb-6">
-        <div className="relative flex items-center flex-1 max-w-md">
-          <input
-            type="text"
-            placeholder={filterType === 'faculty' ? "Search by faculty initial or name..." : "Search by course code..."}
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="input input-bordered w-full pr-12"
-          />
+      <div className="mb-8">
+        <div className="relative flex items-center gap-3 max-w-2xl mx-auto">
+          <div className="relative flex-1">
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder={filterType === 'faculty' ? "Search by faculty initial or name..." : "Search by course code..."}
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
+            />
+          </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="absolute right-1 h-8 w-8 p-0 btn btn-ghost btn-sm">
-                <Filter className="h-4 w-4" />
-              </button>
+              <Button 
+                variant="outline" 
+                className="flex items-center gap-2 px-4 py-3 h-auto bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
+              >
+                <span className="text-sm font-medium">
+                  {filterType === 'faculty' ? 'Faculty' : 'Course'}
+                </span>
+                <ChevronDown className="h-4 w-4" />
+              </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setFilterType('faculty')}>
-                {filterType === 'faculty' && '✓ '}Search by Faculty
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFilterType('course')}>
-                {filterType === 'course' && '✓ '}Search by Course
-              </DropdownMenuItem>
+            <DropdownMenuContent align="end" className="w-48">
+              {filterType === 'faculty' ? (
+                <>
+                  <DropdownMenuItem 
+                    onClick={() => setFilterType('faculty')}
+                    className="cursor-pointer font-medium"
+                  >
+                    ✓ Search by Faculty
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => setFilterType('course')}
+                    className="cursor-pointer"
+                  >
+                    Search by Course
+                  </DropdownMenuItem>
+                </>
+              ) : (
+                <>
+                  <DropdownMenuItem 
+                    onClick={() => setFilterType('course')}
+                    className="cursor-pointer font-medium"
+                  >
+                    ✓ Search by Course
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => setFilterType('faculty')}
+                    className="cursor-pointer"
+                  >
+                    Search by Faculty
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
