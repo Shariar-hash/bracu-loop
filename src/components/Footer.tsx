@@ -43,6 +43,16 @@ export const Footer = () => {
             >
               Admin
             </Link>
+
+            <a
+              href="https://alriar.me"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              title="View Developer Portfolio"
+            >
+              View Developer Portfolio
+            </a>
           </div>
         </div>
       </div>
