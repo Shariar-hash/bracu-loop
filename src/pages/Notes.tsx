@@ -70,12 +70,10 @@ export default function Notes() {
   const [reportDescription, setReportDescription] = useState('');
 
   const courses = [
-    'CSE101', 'CSE110', 'CSE111', 'CSE220', 'CSE221', 'CSE230', 'CSE250', 'CSE251', 'CSE260',
-    'CSE310', 'CSE320', 'CSE321', 'CSE330', 'CSE331', 'CSE340', 'CSE341', 'CSE342', 'CSE350',
-    'CSE360', 'CSE370', 'CSE371', 'CSE390', 'CSE391', 'CSE392', 'CSE410', 'CSE419', 'CSE420', 
-    'CSE421', 'CSE422', 'CSE423', 'CSE424', 'CSE425', 'CSE426', 'CSE427', 'CSE428', 'CSE429',
-    'CSE430', 'CSE431', 'CSE432', 'CSE460', 'CSE461', 'CSE462', 'CSE470', 'CSE471', 'CSE472',
-    'CSE473', 'CSE474', 'CSE490', 'CSE491'
+    'CSE110', 'CSE111', 'CSE220', 'CSE221', 'CSE230', 'CSE250', 'CSE251', 'CSE260',
+    'CSE330', 'CSE331', 'CSE340', 'CSE341', 'CSE350', 'CSE360','CSE370', 'CSE420', 'CSE421', 'CSE422',
+    'CSE423','CSE425','CSE428','CSE437','CSE460','CSE461', 'CSE470', 'CSE471', 'CSE490','CSE491','CSE495', 'MAT110', 'MAT120', 'MAT215',
+    'MAT216', 'PHY111', 'PHY112', 'ENG101', 'ENG102', 'BUS101', 'ECO101'
   ];
 
   const categories = [
