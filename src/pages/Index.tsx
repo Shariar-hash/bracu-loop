@@ -77,7 +77,7 @@ const Index = () => {
   }, []);
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen flex flex-col">
       <Helmet>
         <meta name="google-site-verification" content="bZ8hQ6Qk74nXxd10x1bmvC0-X4BHjUMZL87U68wSRm0" />
       </Helmet>
