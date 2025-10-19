@@ -7,9 +7,24 @@ export const Footer = () => {
     <footer className="border-t bg-background">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-          <p className="text-sm text-muted-foreground">
-            © {currentYear} BRACU Loop. All rights reserved.
-          </p>
+          <div className="text-center sm:text-left">
+            <p className="text-sm text-muted-foreground">
+              © {currentYear} BRACU Loop. All rights reserved.
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Created by{" "}
+              <a 
+                href="https://alriar.me/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-primary hover:text-primary/80 transition-colors font-medium"
+                title="Visit Shariar Rahman's Portfolio"
+              >
+                Shariar Rahman
+              </a>
+              {" "}• BRAC University Student Platform
+            </p>
+          </div>
           <div className="flex gap-6">
             <button 
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -30,6 +45,15 @@ export const Footer = () => {
             >
               Contact
             </Link>
+            <a
+              href="https://alriar.me/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              title="Developer Portfolio"
+            >
+              Portfolio
+            </a>
             <Link
               to="/admin"
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
