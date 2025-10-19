@@ -1,3 +1,4 @@
+import React from 'react';
 import { 
   GraduationCap, 
   FileText, 
@@ -59,6 +60,22 @@ const features = [
 ];
 
 const Index = () => {
+  // Add Google Search Console verification meta tag programmatically
+  React.useEffect(() => {
+    const metaTag = document.createElement('meta');
+    metaTag.name = 'google-site-verification';
+    metaTag.content = 'bZ8hQ6Qk74nXxd10x1bmvC0-X4BHjUMZL87U68wSRm0';
+    document.head.appendChild(metaTag);
+    
+    return () => {
+      // Cleanup: remove the meta tag when component unmounts
+      const existingMeta = document.querySelector('meta[name="google-site-verification"]');
+      if (existingMeta) {
+        document.head.removeChild(existingMeta);
+      }
+    };
+  }, []);
+
   return (
     <div className="min-h-screen">
       <Helmet>
