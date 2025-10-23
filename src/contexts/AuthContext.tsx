@@ -132,8 +132,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('bracu-loop-user', JSON.stringify(userData));
       toast.success(`Welcome back, ${userData.name.split(' ')[0]}!`);
     } else {
-      // Show error for non-BRACU email
-      toast.error('Access denied! Please use your @g.bracu.ac.bd email to sign in.');
+      // Show error for non-BRACU email with more helpful message
+      toast.error('Access denied!', {
+        description: 'Please use your @g.bracu.ac.bd email to sign in. Other email addresses are not permitted.',
+        duration: 6000
+      });
     }
   };
 

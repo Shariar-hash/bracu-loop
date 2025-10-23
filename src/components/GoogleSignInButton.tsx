@@ -21,14 +21,13 @@ export function GoogleSignInButton() {
       buttonRef.current.innerHTML = '';
       
       try {
-        // Initialize with domain hint
+        // Initialize Google Sign-In with improved configuration
         window.google.accounts.id.initialize({
           client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
           callback: handleCredentialResponse,
           auto_select: false,
           cancel_on_tap_outside: true,
           ux_mode: 'popup',
-          hd: 'g.bracu.ac.bd', // Only show BRACU emails
         });
 
         // Responsive button sizing
@@ -48,7 +47,6 @@ export function GoogleSignInButton() {
           fallback.style.display = 'none';
         }
       } catch (error) {
-        console.warn('Google Sign-In button error:', error);
         // Show fallback button if Google button fails
         const fallback = buttonRef.current?.parentElement?.querySelector('.google-signin-fallback') as HTMLElement;
         if (fallback) {
@@ -60,7 +58,7 @@ export function GoogleSignInButton() {
     // Show fallback after timeout if Google button doesn't load
     const timeout = setTimeout(() => {
       if (buttonRef.current && !user) {
-        const hasGoogleButton = buttonRef.current.querySelector('iframe');
+        const hasGoogleButton = buttonRef.current.querySelector('iframe') || buttonRef.current.querySelector('div[role="button"]');
         if (!hasGoogleButton) {
           const fallback = buttonRef.current?.parentElement?.querySelector('.google-signin-fallback') as HTMLElement;
           if (fallback) {
@@ -68,24 +66,40 @@ export function GoogleSignInButton() {
           }
         }
       }
-    }, 2000);
+    }, 3000);
     
     return () => clearTimeout(timeout);
   }, [user, handleCredentialResponse]);
 
   const handleMobileSignIn = () => {
     if (window.google) {
-      // Initialize with domain hint before prompting
-      window.google.accounts.id.initialize({
-        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-        callback: handleCredentialResponse,
-        auto_select: false,
-        cancel_on_tap_outside: true,
-        ux_mode: 'popup',
-        hd: 'g.bracu.ac.bd', // Only show BRACU emails
-      });
-      
-      window.google.accounts.id.prompt();
+      try {
+        // Initialize Google Sign-In
+        window.google.accounts.id.initialize({
+          client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+          callback: handleCredentialResponse,
+          auto_select: false,
+          cancel_on_tap_outside: true,
+          ux_mode: 'popup',
+        });
+        
+        // Force display of account chooser - this will work even if no account is logged in
+        window.google.accounts.id.prompt();
+      } catch (error) {
+        // If all else fails, direct user to Google's sign-in page
+        window.open(
+          `https://accounts.google.com/oauth/authorize?client_id=${import.meta.env.VITE_GOOGLE_CLIENT_ID}&response_type=code&scope=openid%20email%20profile&redirect_uri=${window.location.origin}`,
+          'google-signin',
+          'width=500,height=600,scrollbars=yes,resizable=yes'
+        );
+      }
+    } else {
+      // Direct fallback to Google OAuth
+      window.open(
+        `https://accounts.google.com/oauth/authorize?client_id=${import.meta.env.VITE_GOOGLE_CLIENT_ID}&response_type=code&scope=openid%20email%20profile&redirect_uri=${window.location.origin}`,
+        'google-signin',
+        'width=500,height=600,scrollbars=yes,resizable=yes'
+      );
     }
   };
 

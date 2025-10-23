@@ -12,14 +12,13 @@ export function GoogleSignIn() {
       buttonRef.current.innerHTML = '';
       
       try {
-        // Initialize with domain hint
+        // Initialize Google Sign-In
         window.google.accounts.id.initialize({
           client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
           callback: handleCredentialResponse,
           auto_select: false,
           cancel_on_tap_outside: true,
           ux_mode: 'popup',
-          hd: 'g.bracu.ac.bd', // Only show BRACU emails
         });
 
         window.google.accounts.id.renderButton(buttonRef.current, {
@@ -28,7 +27,7 @@ export function GoogleSignIn() {
           type: "standard",
           text: "signin_with",
           width: 250,
-          locale: "en", // Force English locale
+          locale: "en",
         });
       } catch (error) {
         // Silently handle error
@@ -38,14 +37,13 @@ export function GoogleSignIn() {
 
   const handleManualSignIn = () => {
     if (window.google) {
-      // Initialize with domain hint before prompting
+      // Initialize Google Sign-In
       window.google.accounts.id.initialize({
         client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
         callback: handleCredentialResponse,
         auto_select: false,
         cancel_on_tap_outside: true,
         ux_mode: 'popup',
-        hd: 'g.bracu.ac.bd', // Only show BRACU emails
       });
       
       window.google.accounts.id.prompt();
@@ -58,15 +56,15 @@ export function GoogleSignIn() {
       
       {/* Google's rendered button */}
       <div>
-        <p className="text-sm mb-2">Google Rendered Button (Domain Filtered):</p>
+        <p className="text-sm mb-2">Google Rendered Button (All Emails):</p>
         <div className="google-signin-container" ref={buttonRef}></div>
       </div>
 
       {/* Manual prompt trigger */}
       <div>
-        <p className="text-sm mb-2">Manual Prompt (Domain Filtered):</p>
+        <p className="text-sm mb-2">Manual Prompt (All Emails):</p>
         <Button onClick={handleManualSignIn} variant="outline">
-          Trigger Google Prompt (BRACU Only)
+          Trigger Google Prompt (All Emails)
         </Button>
       </div>
     </div>
