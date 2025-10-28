@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
-    strictPort: false, // Allow automatic port selection if 8080 is busy
+    strictPort: true, // Force port 8080 to match OAuth configuration
   },
   plugins: [
     react(),

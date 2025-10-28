@@ -63,7 +63,7 @@ export function GoogleSignIn() {
       {/* Manual prompt trigger */}
       <div>
         <p className="text-sm mb-2">Manual Prompt (All Emails):</p>
-        <Button onClick={handleManualSignIn} variant="outline">
+        <Button onClick={handleManualSignIn} onTouchStart={handleManualSignIn} variant="outline">
           Trigger Google Prompt (All Emails)
         </Button>
       </div>

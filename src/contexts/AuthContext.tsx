@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { toast } from 'sonner';
 import AdminService from '@/lib/adminService';
+import { supabase } from '@/lib/supabaseClient';
+import type { User } from '@supabase/supabase-js';
 
 // Define types for Google credential response
 interface CredentialResponse {
@@ -59,12 +61,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing user in localStorage and verify they're not banned
+    // Check for existing Supabase session and verify they're not banned
     const checkAndLoadUser = async () => {
-      const savedUser = localStorage.getItem('bracu-loop-user');
-      if (savedUser) {
-        try {
-          const userData = JSON.parse(savedUser);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          const supabaseUser = session.user;
+          
+          // Check if email domain is allowed
+          if (!supabaseUser.email?.endsWith('@g.bracu.ac.bd')) {
+            toast.error('Access denied!', {
+              description: 'Please use your @g.bracu.ac.bd email to sign in.',
+              duration: 6000
+            });
+            await supabase.auth.signOut();
+            setIsLoading(false);
+            return;
+          }
+          
+          const userData: GoogleUser = {
+            email: supabaseUser.email,
+            name: supabaseUser.user_metadata.full_name || supabaseUser.email.split('@')[0],
+            picture: supabaseUser.user_metadata.avatar_url || '',
+            sub: supabaseUser.id,
+          };
           
           // Check if user is banned
           try {
@@ -81,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 description: 'You have been automatically signed out. Contact administrators if you believe this is an error.'
               });
               
-              localStorage.removeItem('bracu-loop-user');
+              await supabase.auth.signOut();
               setUser(null);
               setIsLoading(false);
               return;
@@ -91,14 +112,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
           
           setUser(userData);
-        } catch (error) {
-          localStorage.removeItem('bracu-loop-user');
+          localStorage.setItem('bracu-loop-user', JSON.stringify(userData));
         }
+      } catch (error) {
+        console.error('Error loading user session:', error);
       }
+      
       setIsLoading(false);
     };
     
     checkAndLoadUser();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        const supabaseUser = session.user;
+        
+        // Check if email domain is allowed
+        if (!supabaseUser.email?.endsWith('@g.bracu.ac.bd')) {
+          toast.error('Access denied!', {
+            description: 'Please use your @g.bracu.ac.bd email to sign in.',
+            duration: 6000
+          });
+          await supabase.auth.signOut();
+          return;
+        }
+        
+        const userData: GoogleUser = {
+          email: supabaseUser.email,
+          name: supabaseUser.user_metadata.full_name || supabaseUser.email.split('@')[0],
+          picture: supabaseUser.user_metadata.avatar_url || '',
+          sub: supabaseUser.id,
+        };
+        
+        setUser(userData);
+        localStorage.setItem('bracu-loop-user', JSON.stringify(userData));
+        toast.success(`Welcome back, ${userData.name.split(' ')[0]}!`);
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        localStorage.removeItem('bracu-loop-user');
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const handleCredentialResponse = async (response: CredentialResponse) => {
@@ -140,13 +196,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signOut = () => {
-    setUser(null);
-    localStorage.removeItem('bracu-loop-user');
-    if (window.google) {
-      window.google.accounts.id.disableAutoSelect();
+  const signOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      localStorage.removeItem('bracu-loop-user');
+      toast.success('Signed out successfully');
+    } catch (error) {
+      console.error('Error signing out:', error);
+      toast.error('Error signing out');
     }
-    toast.success('Signed out successfully');
   };
 
   return (

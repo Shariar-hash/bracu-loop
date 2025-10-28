@@ -1,6 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { LogOut, User } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
+import { toast } from "sonner";
 import { useEffect, useRef } from "react";
 import {
   DropdownMenu,
@@ -14,92 +16,33 @@ export function GoogleSignInButton() {
   const { user, signOut, isLoading, handleCredentialResponse } = useAuth();
   const buttonRef = useRef<HTMLDivElement>(null);
 
-  // Initialize Google Sign-in button with better mobile support
+  // Skip the Google Identity Services entirely - use Supabase for all sign-ins
   useEffect(() => {
-    if (window.google && buttonRef.current && !user) {
-      // Clear any existing content
-      buttonRef.current.innerHTML = '';
-      
-      try {
-        // Initialize Google Sign-In with improved configuration
-        window.google.accounts.id.initialize({
-          client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-          callback: handleCredentialResponse,
-          auto_select: false,
-          cancel_on_tap_outside: true,
-          ux_mode: 'popup',
-        });
-
-        // Responsive button sizing
-        const isMobile = window.innerWidth < 768;
-        window.google.accounts.id.renderButton(buttonRef.current, {
-          theme: "outline",
-          size: isMobile ? "medium" : "large",
-          type: "standard",
-          text: isMobile ? "signin" : "signin_with",
-          width: isMobile ? 150 : 200,
-          locale: "en",
-        });
-        
-        // Hide fallback button since Google button loaded
-        const fallback = buttonRef.current?.parentElement?.querySelector('.google-signin-fallback') as HTMLElement;
-        if (fallback) {
-          fallback.style.display = 'none';
-        }
-      } catch (error) {
-        // Show fallback button if Google button fails
-        const fallback = buttonRef.current?.parentElement?.querySelector('.google-signin-fallback') as HTMLElement;
-        if (fallback) {
-          fallback.style.display = 'inline-flex';
-        }
-      }
-    }
-    
-    // Show fallback after timeout if Google button doesn't load
-    const timeout = setTimeout(() => {
-      if (buttonRef.current && !user) {
-        const hasGoogleButton = buttonRef.current.querySelector('iframe') || buttonRef.current.querySelector('div[role="button"]');
-        if (!hasGoogleButton) {
-          const fallback = buttonRef.current?.parentElement?.querySelector('.google-signin-fallback') as HTMLElement;
-          if (fallback) {
-            fallback.style.display = 'inline-flex';
-          }
-        }
-      }
-    }, 3000);
-    
-    return () => clearTimeout(timeout);
+    // Don't initialize Google Identity Services anymore
+    // All sign-ins will go through Supabase OAuth redirect
   }, [user, handleCredentialResponse]);
 
-  const handleMobileSignIn = () => {
-    if (window.google) {
-      try {
-        // Initialize Google Sign-In
-        window.google.accounts.id.initialize({
-          client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-          callback: handleCredentialResponse,
-          auto_select: false,
-          cancel_on_tap_outside: true,
-          ux_mode: 'popup',
-        });
-        
-        // Force display of account chooser - this will work even if no account is logged in
-        window.google.accounts.id.prompt();
-      } catch (error) {
-        // If all else fails, direct user to Google's sign-in page
-        window.open(
-          `https://accounts.google.com/oauth/authorize?client_id=${import.meta.env.VITE_GOOGLE_CLIENT_ID}&response_type=code&scope=openid%20email%20profile&redirect_uri=${window.location.origin}`,
-          'google-signin',
-          'width=500,height=600,scrollbars=yes,resizable=yes'
-        );
+  const handleMobileSignIn = async () => {
+    try {
+      // Use redirect instead of popup to avoid COOP issues
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'select_account',
+            // Don't use hd parameter - let any Google account show up, 
+            // but we'll filter in the callback
+          }
+        }
+      });
+      
+      if (error) {
+        throw error;
       }
-    } else {
-      // Direct fallback to Google OAuth
-      window.open(
-        `https://accounts.google.com/oauth/authorize?client_id=${import.meta.env.VITE_GOOGLE_CLIENT_ID}&response_type=code&scope=openid%20email%20profile&redirect_uri=${window.location.origin}`,
-        'google-signin',
-        'width=500,height=600,scrollbars=yes,resizable=yes'
-      );
+    } catch (error) {
+      toast.error('Sign-in failed. Please try again.');
     }
   };
 
@@ -156,26 +99,23 @@ export function GoogleSignInButton() {
 
   return (
     <>
-      {/* Desktop Google Sign-in Button with Fallback */}
-      <div className="hidden sm:flex items-center gap-2">
-        <div className="google-signin-container" ref={buttonRef}></div>
-        {/* Fallback button if Google doesn't load */}
-        <Button 
-          variant="outline" 
-          onClick={handleMobileSignIn}
-          className="google-signin-fallback"
-          style={{ display: 'none' }}
-        >
-          Sign in with Google
-        </Button>
-      </div>
-      
-      {/* Mobile Sign-in Button */}
-      <Button 
-        variant="ghost" 
-        size="sm"
-        className="sm:hidden text-xs px-2"
+      {/* Desktop Google Sign-in Button */}
+      <Button
+        variant="outline"
         onClick={handleMobileSignIn}
+        className="hidden sm:inline-flex"
+      >
+        Sign in with Google
+      </Button>
+
+      {/* Mobile Sign-in Button */}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="sm:hidden text-xs px-3 py-2 z-50"
+        onClick={handleMobileSignIn}
+        onTouchStart={handleMobileSignIn}
+        aria-label="Sign in with Google"
       >
         Sign in
       </Button>
