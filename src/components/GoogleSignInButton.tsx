@@ -24,11 +24,16 @@ export function GoogleSignInButton() {
 
   const handleMobileSignIn = async () => {
     try {
+      // Determine the correct redirect URL based on environment
+      const redirectTo = window.location.origin === 'http://localhost:8080' 
+        ? 'http://localhost:8080' 
+        : 'https://bracu-loop.vercel.app';
+      
       // Use redirect instead of popup to avoid COOP issues
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/`,
+          redirectTo,
           queryParams: {
             access_type: 'offline',
             prompt: 'select_account',
@@ -39,10 +44,12 @@ export function GoogleSignInButton() {
       });
       
       if (error) {
+        console.error('Supabase OAuth error details:', error);
         throw error;
       }
     } catch (error) {
-      toast.error('Sign-in failed. Please try again.');
+      console.error('Sign-in error:', error);
+      toast.error('Sign-in failed. Please try again or contact support.');
     }
   };
 
