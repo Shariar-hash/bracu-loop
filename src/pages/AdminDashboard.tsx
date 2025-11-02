@@ -390,6 +390,23 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleViewContent = async (report: ReportedContent) => {
+    try {
+      const result = await AdminService.getContentForReview(report.content_type, report.content_id);
+      
+      if (result.success && result.url) {
+        // Open the content in a new tab
+        window.open(result.url, '_blank');
+        toast.success('Opening content for review');
+      } else {
+        toast.error(result.error || 'Failed to access content');
+      }
+    } catch (error) {
+      console.error('Error viewing content:', error);
+      toast.error('Failed to access content');
+    }
+  };
+
   const addCourse = async () => {
     try {
       console.log('📚 Adding course with data:', courseForm);
@@ -1786,6 +1803,37 @@ const AdminDashboard = () => {
                       ⚠️ File URL not available - may need to check database or file storage
                     </div>
                   )}
+                </div>
+              )}
+              
+              {/* Special handling for student notes */}
+              {selectedReport.content_type === 'student_note' && (
+                <div className="border-t pt-4 bg-green-50 dark:bg-green-950 p-4 rounded-lg">
+                  <Label className="text-green-700 dark:text-green-300 font-semibold flex items-center gap-2">
+                    📝 Student Note Access
+                  </Label>
+                  
+                  <div className="mt-3">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => handleViewContent(selectedReport)}
+                      className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2"
+                    >
+                      <Eye className="h-4 w-4" />
+                      View & Review Content
+                    </Button>
+                    <div className="text-sm text-green-700 dark:text-green-300 mt-2">
+                      📁 <strong>Title:</strong> {selectedReport.content_snapshot?.title || 'Unknown title'}
+                      <br />
+                      📚 <strong>Course:</strong> {selectedReport.content_snapshot?.course_code || 'Unknown course'}
+                      <br />
+                      📂 <strong>Type:</strong> {selectedReport.content_snapshot?.upload_type === 'file' ? 'File Upload' : 'External Link'}
+                    </div>
+                    <p className="text-xs text-green-600 dark:text-green-400 mt-2 italic">
+                      💡 Click to {selectedReport.content_snapshot?.upload_type === 'file' ? 'download the file' : 'open the external link'} and review the reported content before taking action
+                    </p>
+                  </div>
                 </div>
               )}
               

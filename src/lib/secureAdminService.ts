@@ -579,6 +579,106 @@ This is an automated notification from BRACU Loop.
     }
   }
 
+  // ADMIN CONTENT ACCESS - Allow admin to view/access reported content for review
+  static async getContentForReview(contentType: string, contentId: string): Promise<{ success: boolean; url?: string; content?: any; error?: string }> {
+    try {
+      console.log(`🔍 Admin accessing ${contentType} with ID: ${contentId}`);
+      
+      if (contentType === 'student_note') {
+        // Get note details first to verify it exists
+        const { data: note, error: noteError } = await supabase
+          .from('student_notes')
+          .select('*')
+          .eq('id', contentId)
+          .single();
+
+        if (noteError || !note) {
+          console.error('Student note not found:', noteError);
+          return { success: false, error: 'Student note not found' };
+        }
+
+        console.log('Found note:', note.title, 'Type:', note.upload_type);
+
+        // Use the same logic as regular users but without incrementing download count
+        if (note.upload_type === 'link') {
+          // For links, return the link URL directly
+          console.log('Returning link URL:', note.link_url);
+          return { 
+            success: true, 
+            url: note.link_url,
+            content: note
+          };
+        } else if (note.upload_type === 'file' && note.file_path) {
+          // For files, create signed URL for admin to access
+          console.log('Creating signed URL for file:', note.file_path);
+          const { data: signedUrlData, error: urlError } = await supabase.storage
+            .from('student-notes')
+            .createSignedUrl(note.file_path, 3600); // 1 hour expiry
+
+          if (urlError) {
+            console.error('Failed to create signed URL:', urlError);
+            return { success: false, error: 'Failed to create access URL: ' + urlError.message };
+          }
+
+          console.log('Generated signed URL successfully');
+          return { 
+            success: true, 
+            url: signedUrlData.signedUrl,
+            content: note
+          };
+        } else {
+          return { success: false, error: 'Note has no file or link content' };
+        }
+
+      } else if (contentType === 'question_paper') {
+        // Handle question paper access
+        const isNumericId = !isNaN(Number(contentId)) && contentId.trim() !== '';
+        
+        let query = supabase
+          .from('question_papers')
+          .select('*');
+
+        if (isNumericId) {
+          query = query.eq('id', Number(contentId));
+        } else {
+          query = query.eq('id', contentId);
+        }
+
+        const { data: question, error: questionError } = await query.single();
+
+        if (questionError || !question) {
+          return { success: false, error: 'Question paper not found' };
+        }
+
+        // Create signed URL for admin access
+        if (question.storage_path) {
+          const { data: signedUrlData, error: urlError } = await supabase.storage
+            .from('question-papers')
+            .createSignedUrl(question.storage_path, 3600);
+
+          if (urlError) {
+            return { success: false, error: 'Failed to create access URL' };
+          }
+
+          return { 
+            success: true, 
+            url: signedUrlData.signedUrl,
+            content: question
+          };
+        }
+
+        return { success: true, content: question };
+
+      } else {
+        return { success: false, error: `Content type ${contentType} not supported for admin review` };
+      }
+
+    } catch (error) {
+      console.error('Error getting content for admin review:', error);
+      return { success: false, error: 'Failed to access content: ' + (error as Error).message };
+    }
+  }
+
   static async getBannedUsers(): Promise<BannedUser[]> {
     try {
       const { data, error } = await supabase

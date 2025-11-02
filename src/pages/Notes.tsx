@@ -35,6 +35,7 @@ import {
   Calendar,
   User,
   FileUp,
+  ExternalLink,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -451,8 +452,13 @@ export default function Notes() {
                     <div className="flex items-center gap-2">
                       <Download className="h-4 w-4" />
                       <span>{note.download_count} downloads</span>
-                      <span className="mx-2">•</span>
-                      <span>{formatFileSize(note.file_size)}</span>
+                      {/* Show file size only for file uploads and when file_size is a valid number */}
+                      {note.upload_type === 'file' && typeof note.file_size === 'number' && !isNaN(note.file_size) && (
+                        <>
+                          <span className="mx-2">•</span>
+                          <span>{formatFileSize(note.file_size)}</span>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -464,8 +470,12 @@ export default function Notes() {
                       className="flex-1"
                       size="sm"
                     >
-                      <Download className="h-4 w-4 mr-2" />
-                      Download
+                      {note.upload_type === 'link' ? (
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                      ) : (
+                        <Download className="h-4 w-4 mr-2" />
+                      )}
+                      {note.upload_type === 'link' ? 'View link' : 'Download'}
                     </Button>
                     {user && (
                       <Button

@@ -142,6 +142,23 @@ const SecureAdminDashboard = () => {
     setReportModalOpen(true);
   };
 
+  const handleViewContent = async (report: ReportedContent) => {
+    try {
+      const result = await SecureAdminService.getContentForReview(report.content_type, report.content_id);
+      
+      if (result.success && result.url) {
+        // Open the content in a new tab
+        window.open(result.url, '_blank');
+        toast.success('Opening content for review');
+      } else {
+        toast.error(result.error || 'Failed to access content');
+      }
+    } catch (error) {
+      console.error('Error viewing content:', error);
+      toast.error('Failed to access content');
+    }
+  };
+
   const handleReportAction = async (reportId: string, action: string, notes?: string) => {
     try {
       await SecureAdminService.updateReportStatus(reportId, action, notes);
@@ -419,6 +436,29 @@ const SecureAdminDashboard = () => {
                           >
                             <Eye className="w-4 h-4 mr-1" />
                             View
+                          </Button>
+                          {(report.content_type === 'student_note' || report.content_type === 'question_paper') && (
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleViewContent(report)}
+                              className="text-blue-600 hover:text-blue-700"
+                            >
+                              <Eye className="w-4 h-4 mr-1" />
+                              View Content
+                            </Button>
+                          )}
+                          {/* Debug button - always visible */}
+                          <Button 
+                            size="sm" 
+                            variant="secondary"
+                            onClick={() => {
+                              alert(`Content Type: "${report.content_type}"\nContent ID: ${report.content_id}`);
+                              handleViewContent(report);
+                            }}
+                            className="text-purple-600 hover:text-purple-700"
+                          >
+                            🔍 Debug
                           </Button>
                         </div>
                       </div>

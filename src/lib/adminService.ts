@@ -14,7 +14,7 @@ export interface AdminUser {
 
 export interface ReportedContent {
   id: string;
-  content_type: 'faculty_review' | 'question_paper' | 'suggestion_post' | 'suggestion_comment';
+  content_type: 'faculty_review' | 'question_paper' | 'suggestion_post' | 'suggestion_comment' | 'student_note';
   content_id: string;
   reason: string;
   description?: string;
@@ -189,7 +189,8 @@ class AdminService {
         content_table: reportData.content_type === 'question_paper' ? 'question-papers' :
                       reportData.content_type === 'suggestion_post' ? 'suggestion_posts' :
                       reportData.content_type === 'suggestion_comment' ? 'suggestion_comments' :
-                      reportData.content_type === 'faculty_review' ? 'reviews' : 'unknown',
+                      reportData.content_type === 'faculty_review' ? 'reviews' :
+                      reportData.content_type === 'student_note' ? 'student_notes' : 'unknown',
         reason: reportData.reason,
         description: reportData.description || null,
         reporter_email: reportData.reporter_email,
@@ -276,6 +277,106 @@ class AdminService {
     } catch (error) {
       console.error('Error deleting report:', error);
       throw new Error('Failed to delete report');
+    }
+  }
+
+  // ADMIN CONTENT ACCESS - Allow admin to view/access reported content for review
+  static async getContentForReview(contentType: string, contentId: string): Promise<{ success: boolean; url?: string; content?: any; error?: string }> {
+    try {
+      console.log(`🔍 Admin accessing ${contentType} with ID: ${contentId}`);
+      
+      if (contentType === 'student_note') {
+        // Get note details first to verify it exists
+        const { data: note, error: noteError } = await supabase
+          .from('student_notes')
+          .select('*')
+          .eq('id', contentId)
+          .single();
+
+        if (noteError || !note) {
+          console.error('Student note not found:', noteError);
+          return { success: false, error: 'Student note not found' };
+        }
+
+        console.log('Found note:', note.title, 'Type:', note.upload_type);
+
+        // Use the same logic as regular users but without incrementing download count
+        if (note.upload_type === 'link') {
+          // For links, return the link URL directly
+          console.log('Returning link URL:', note.link_url);
+          return { 
+            success: true, 
+            url: note.link_url,
+            content: note
+          };
+        } else if (note.upload_type === 'file' && note.file_path) {
+          // For files, create signed URL for admin to access
+          console.log('Creating signed URL for file:', note.file_path);
+          const { data: signedUrlData, error: urlError } = await supabase.storage
+            .from('student-notes')
+            .createSignedUrl(note.file_path, 3600); // 1 hour expiry
+
+          if (urlError) {
+            console.error('Failed to create signed URL:', urlError);
+            return { success: false, error: 'Failed to create access URL: ' + urlError.message };
+          }
+
+          console.log('Generated signed URL successfully');
+          return { 
+            success: true, 
+            url: signedUrlData.signedUrl,
+            content: note
+          };
+        } else {
+          return { success: false, error: 'Note has no file or link content' };
+        }
+
+      } else if (contentType === 'question_paper') {
+        // Handle question paper access
+        const isNumericId = !isNaN(Number(contentId)) && contentId.trim() !== '';
+        
+        let query = supabase
+          .from('question_papers')
+          .select('*');
+
+        if (isNumericId) {
+          query = query.eq('id', Number(contentId));
+        } else {
+          query = query.eq('id', contentId);
+        }
+
+        const { data: question, error: questionError } = await query.single();
+
+        if (questionError || !question) {
+          return { success: false, error: 'Question paper not found' };
+        }
+
+        // Create signed URL for admin access
+        if (question.storage_path) {
+          const { data: signedUrlData, error: urlError } = await supabase.storage
+            .from('question-papers')
+            .createSignedUrl(question.storage_path, 3600);
+
+          if (urlError) {
+            return { success: false, error: 'Failed to create access URL' };
+          }
+
+          return { 
+            success: true, 
+            url: signedUrlData.signedUrl,
+            content: question
+          };
+        }
+
+        return { success: true, content: question };
+
+      } else {
+        return { success: false, error: `Content type ${contentType} not supported for admin review` };
+      }
+
+    } catch (error) {
+      console.error('Error getting content for admin review:', error);
+      return { success: false, error: 'Failed to access content: ' + (error as Error).message };
     }
   }
 
@@ -377,30 +478,92 @@ class AdminService {
         
       } else if (contentType === 'question_paper') {
         // Get question details first to find owner email (admin can bypass ownership)
-        const { data: question } = await supabase
+        // IDs for question_papers may be stored as numeric or string (UUID); avoid parseInt which can produce NaN
+        const isNumericId = !isNaN(Number(contentId)) && contentId.trim() !== '';
+
+        let query = supabase
           .from('question_papers')
-          .select('uploaded_by_email, storage_path, title')
-          .eq('id', parseInt(contentId))
-          .single();
-        
-        if (question) {
+          .select('uploaded_by_email, storage_path, title');
+
+        if (isNumericId) {
+          query = query.eq('id', Number(contentId));
+        } else {
+          query = query.eq('id', contentId);
+        }
+
+        const { data: question, error: questionError } = await query.single();
+
+        if (questionError) {
+          console.warn('Question lookup failed:', questionError);
+          deleteError = questionError;
+          deleted = false;
+        } else if (question) {
           // Admin delete - delete storage file first
           if (question.storage_path) {
             const { error: storageError } = await supabase.storage
               .from('question-papers')
               .remove([question.storage_path]);
-            
+
             if (storageError) {
               console.warn('Storage delete warning:', storageError.message);
             }
           }
-          
-          // Then delete from database
-          const { error } = await supabase.from('question_papers').delete().eq('id', parseInt(contentId));
-          deleteError = error;
-          deleted = !error;
+
+          // Then delete from database using the same id type used for lookup
+          const deleteQuery = supabase.from('question_papers').delete();
+          if (isNumericId) {
+            const { error } = await deleteQuery.eq('id', Number(contentId));
+            deleteError = error;
+            deleted = !error;
+          } else {
+            const { error } = await deleteQuery.eq('id', contentId);
+            deleteError = error;
+            deleted = !error;
+          }
         } else {
           deleteError = new Error('Question not found');
+          deleted = false;
+        }
+      } else if (contentType === 'student_note') {
+        console.log(`📝 Deleting student note with ID: ${contentId}`);
+        
+        // Get note details first to find file path for storage cleanup
+        const { data: note, error: noteError } = await supabase
+          .from('student_notes')
+          .select('uploader_email, file_path, upload_type, title')
+          .eq('id', contentId)
+          .single();
+
+        if (noteError) {
+          console.warn('Note lookup failed:', noteError);
+          deleteError = noteError;
+          deleted = false;
+        } else if (note) {
+          // Admin delete - delete storage file first if it's a file upload
+          if (note.upload_type === 'file' && note.file_path) {
+            const { error: storageError } = await supabase.storage
+              .from('student-notes')
+              .remove([note.file_path]);
+
+            if (storageError) {
+              console.warn('Storage delete warning:', storageError.message);
+            }
+          }
+
+          // Then delete from database
+          const { error } = await supabase
+            .from('student_notes')
+            .delete()
+            .eq('id', contentId);
+          
+          deleteError = error;
+          deleted = !error;
+          
+          if (deleted) {
+            console.log('✅ Successfully deleted student note:', note.title);
+          }
+        } else {
+          deleteError = new Error('Student note not found');
           deleted = false;
         }
       }
