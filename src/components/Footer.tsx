@@ -14,7 +14,7 @@ export const Footer = () => {
               © {currentYear} BRACU Loop. All rights reserved.
             </p>
             <p className="text-xs text-muted-foreground">
-              Created by <a href="https://alriar.me/" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">Montasir Shariar</a> & <a href="https://www.sifatullahfahim.com/" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">Sifatullah Fahim</a> • BRAC University Student Platform
+              Created by <a href="https://montasir-mogumder-shariar.vercel.app" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">Montasir Shariar</a> & <a href="https://www.sifatullahfahim.com/" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">Sifatullah Fahim</a> • BRAC University Student Platform
             </p>
           </div>
           <div className="flex items-center gap-6">
@@ -45,7 +45,7 @@ export const Footer = () => {
               Admin
             </Link>
             <a
-              href="https://alriar.me"
+              href="https://montasir-mogumder-shariar.vercel.app"
               target="_blank"
               rel="noopener noreferrer"
               className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
@@ -64,7 +64,7 @@ export const Footer = () => {
               © {currentYear} BRACU Loop. All rights reserved.
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              Created by <a href="https://alriar.me/" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">Montasir Shariar</a> & <a href="https://www.sifatullahfahim.com/" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">Sifatullah Fahim</a>
+              Created by <a href="https://montasir-mogumder-shariar.vercel.app" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">Montasir Shariar</a> & <a href="https://www.sifatullahfahim.com/" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">Sifatullah Fahim</a>
             </p>
             <p className="text-xs text-muted-foreground">
               BRAC University Student Platform
@@ -104,7 +104,7 @@ export const Footer = () => {
             
             {/* Portfolio link on separate line for mobile */}
             <a
-              href="https://alriar.me"
+              href="https://montasir-mogumder-shariar.vercel.app"
               target="_blank"
               rel="noopener noreferrer"
               className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
