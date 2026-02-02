@@ -1,4 +1,5 @@
 # BRACU Loop - BRAC University Student Platform
+# Keywords: bracu, bracu l, bracu lo, bracu loo, bracu loop, BRAC University
 # Created by Montasir Shariar - https://alriar.me/
 
 User-agent: *
